@@ -120,7 +120,7 @@ td.pl{max-width:360px;overflow:hidden;text-overflow:ellipsis}
         <div id="chVar"></div>
       </div>
       <div class="card">
-        <div class="cardhead"><div><h3>Estado del reach en CM</h3><div class="hint">Líneas según si CM puede entregar un reach total deduplicado.</div></div></div>
+        <div class="cardhead"><div><h3>Network codes con mayor variación</h3><div class="hint">Los 12 con mayor diferencia absoluta en la métrica seleccionada (mínimo 10 M de impresiones CM). Color por plataforma.</div></div></div>
         <div id="chStatus"></div>
       </div>
     </section>
@@ -128,7 +128,7 @@ td.pl{max-width:360px;overflow:hidden;text-overflow:ellipsis}
     <section class="card" style="margin-top:14px">
       <div class="cardhead"><div><h3>Seguimiento semanal</h3><div class="hint">Semana domingo–sábado, para las líneas del filtro. Solo semanas con dato en ambos lados. El reach semanal no se suma entre semanas; el IIEE sí.</div></div>
         <div class="seg" id="segWeek"><button data-m="iiee" class="on">IIEE</button><button data-m="reach">Reach 1+</button><button data-m="impr">Impresiones</button></div></div>
-      <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360</span><span><span class="sw" style="background:var(--s-pl)"></span>Plataforma</span><span id="wkInfo" style="margin-left:auto;color:var(--ink-3)"></span></div>
+      <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360</span><span><span class="sw" style="background:var(--s-pl)"></span><span class="plname">Plataforma</span></span><span id="wkInfo" style="margin-left:auto;color:var(--ink-3)"></span></div>
       <div id="chWeek"></div>
     </section>
 
@@ -158,6 +158,11 @@ const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+' B':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+' M':Math.abs(n)>=1e3?(n/1e3).toFixed(0)+' K':String(n);
 const fmtN=n=>n==null?'—':Number(n).toLocaleString('es-CO');
 const pct=v=>v==null||!isFinite(v)?'—':(v>0?'+':'')+(v*100).toFixed(1)+'%';
+const platOf=r=>{const p=r[K.Plataforma];if(p!=='DV360')return p;const t=((r[K.Placement]||'').split('_')[2]||'').toUpperCase();
+  if(/(^|-)YT(-|$)|DVYTA|BUMPER/.test(t))return 'DV360 · YouTube';
+  if(/^(G-DV|DV-DV)-(DISPLAY|VIDEO|VIDISP|VID-TP|DISP-TP)$/.test(t))return 'DV360 · Open';
+  return 'DV360 · Deals/Direct'};
+const PCOLG={'DV360 · Open':'#2a78d6','DV360 · YouTube':'#e34948','DV360 · Deals/Direct':'#6250d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
 const brandOf=r=>r[K.Advertiser]&&r[K.Advertiser].includes('MercadoPago')?'MP':'ML';
 const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
@@ -166,7 +171,7 @@ $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('e
 const F={country:'',platform:'',network:'',brand:'',year:'',status:'valid',match:''};
 const fill=(sel,vals)=>{vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o)})};
 // Filtros dinámicos: cada lista muestra solo los valores presentes en las líneas que pasan los demás filtros
-const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',r=>r[K.Plataforma],'Todas'],['fNetwork','network',r=>r[K.Network_Code],'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos']];
+const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',platOf,'Todas'],['fNetwork','network',r=>r[K.Network_Code],'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos']];
 const BRANDNAME={ML:'Mercado Libre',MP:'Mercado Pago'};
 function passes(r,skip){
   for(const [,k,get] of DIMS){if(k===skip)continue;if(F[k]&&get(r)!==F[k])return false}
@@ -184,7 +189,7 @@ function refreshOptions(){
 [['fCountry','country'],['fPlatform','platform'],['fNetwork','network'],['fBrand','brand'],['fYear','year'],['fStatus','status'],['fMatch','match']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{F[k]=e.target.value;page=0;render()}));
 $('#reset').onclick=()=>{Object.assign(F,{country:'',platform:'',network:'',brand:'',year:'',status:'valid',match:''});['fCountry','fPlatform','fNetwork','fBrand','fYear','fMatch'].forEach(id=>$('#'+id).value='');$('#fStatus').value='valid';$('#q').value='';q='';page=0;render()};
 let metric='impr',wmetric='iiee',q='',page=0,sortK='Impressions_CM',sortD=-1;
-$('#segMetric').onclick=e=>{if(!e.target.dataset.m)return;metric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawVar()};
+$('#segMetric').onclick=e=>{if(!e.target.dataset.m)return;metric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawVar();drawStatus()};
 $('#segWeek').onclick=e=>{if(!e.target.dataset.m)return;wmetric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawWeek()};
 $('#q').oninput=e=>{q=e.target.value.trim().toLowerCase();page=0;render()};
 
@@ -192,7 +197,7 @@ const matchQ=r=>q.split(/\s+/).every(t=>[r[K.Placement],r[K.TOOL],r[K.Placement_
 function filtered(){
   return L.filter(r=>{
     if(F.country&&r[K.Country]!==F.country)return false;
-    if(F.platform&&r[K.Plataforma]!==F.platform)return false;
+    if(F.platform&&platOf(r)!==F.platform)return false;
     if(F.network&&r[K.Network_Code]!==F.network)return false;
     if(F.brand&&brandOf(r)!==F.brand)return false;
     if(F.year&&yearOf(r)!==F.year)return false;
@@ -211,11 +216,11 @@ let cur=[];
 function render(){refreshOptions();cur=filtered();drawKpis();drawVar();drawStatus();drawWeek();drawTable()}
 
 function drawKpis(){
-  const el=$('#kpis');el.innerHTML='';
+  const el=$('#kpis');el.innerHTML='';document.querySelectorAll('.plname').forEach(e=>e.textContent=F.platform||'Plataforma');
   ['impr','reach','iiee'].forEach(m=>{const s=sums(cur,m);
     el.insertAdjacentHTML('beforeend',`<div class="card kpi"><h3>${MET[m][2]}</h3><div class="row">
       <div><span class="lab"><span class="dot" style="background:var(--s-cm)"></span>CM360</span><span class="num">${fmt(s.cm)}</span></div>
-      <div><span class="lab"><span class="dot" style="background:var(--s-pl)"></span>Plataforma</span><span class="num">${fmt(s.pl)}</span></div>
+      <div><span class="lab"><span class="dot" style="background:var(--s-pl)"></span>${F.platform||'Plataforma'}</span><span class="num">${fmt(s.pl)}</span></div>
       <div><span class="lab">VAR</span><span class="var ${s.v>0?'pos':s.v<0?'neg':''}">${pct(s.v)}</span></div></div>
       <div class="hint">${fmtN(s.n)} líneas con dato en ambos lados</div></div>`)});
   const matched=cur.filter(r=>r[K.Plataforma]).length, run=cur.filter(r=>r[K.En_curso]).length;
@@ -229,10 +234,10 @@ function hideTT(){tt.style.opacity=0}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function drawVar(){
-  const plats=[...new Set(cur.map(r=>r[K.Plataforma]).filter(Boolean))].sort();
+  const plats=[...new Set(cur.filter(r=>r[K.Plataforma]).map(platOf))].sort();
   const countries=[...new Set(cur.map(r=>r[K.Country]))].sort();
-  $('#legPlat').innerHTML=plats.map(p=>`<span><span class="sw" style="background:${PCOL[p]||'#999'}"></span>${p}</span>`).join('')||'<span style="color:var(--ink-3)">Sin líneas cruzadas en el filtro</span>';
-  const cells=[];countries.forEach(c=>plats.forEach(p=>{const s=sums(cur.filter(r=>r[K.Country]===c&&r[K.Plataforma]===p),metric);if(s.n)cells.push({c,p,...s})}));
+  $('#legPlat').innerHTML=plats.map(p=>`<span><span class="sw" style="background:${PCOLG[p]||'#999'}"></span>${p}</span>`).join('')||'<span style="color:var(--ink-3)">Sin líneas cruzadas en el filtro</span>';
+  const cells=[];countries.forEach(c=>plats.forEach(p=>{const s=sums(cur.filter(r=>r[K.Country]===c&&r[K.Plataforma]&&platOf(r)===p),metric);if(s.n)cells.push({c,p,...s})}));
   const box=$('#chVar');
   if(!cells.length){box.innerHTML='<div class="empty">Sin datos para el filtro</div>';return}
   const W_=760,H=70+countries.length*44,mL=50,mR=60,mT=14,mB=30;
@@ -247,7 +252,7 @@ function drawVar(){
   s+=`<line x1="${x(0)}" x2="${x(0)}" y1="${mT}" y2="${H-mB}" stroke="var(--ink-2)" stroke-width="1.5"/>`;
   countries.forEach((c,i)=>{const y0=mT+10+i*44;s+=`<text class="lbl" x="${mL-8}" y="${y0+plats.length*bh/2+4}" text-anchor="end">${c}</text>`;
     plats.forEach((p,j)=>{const d=cells.find(k=>k.c===c&&k.p===p);if(!d)return;const y=y0+j*(bh+2);const x0=x(0),x1=x(d.v);
-      s+=`<rect class="bar" x="${Math.min(x0,x1)}" y="${y}" width="${Math.max(2,Math.abs(x1-x0))}" height="${bh}" fill="${PHEX[p]||'#999'}" data-i="${cells.indexOf(d)}"/>
+      s+=`<rect class="bar" x="${Math.min(x0,x1)}" y="${y}" width="${Math.max(2,Math.abs(x1-x0))}" height="${bh}" fill="${PCOLG[p]||'#999'}" data-i="${cells.indexOf(d)}"/>
       <text class="lbl" x="${x1+(d.v>=0?5:-5)}" y="${y+bh-2}" text-anchor="${d.v>=0?'start':'end'}" style="font-size:10.5px">${pct(d.v)}${d.v>hi?' ›':''}</text>`})});
   s+='</svg>';box.innerHTML=s;
   box.querySelectorAll('rect').forEach(r=>{r.onmousemove=e=>{const d=cells[+r.dataset.i];showTT(e,`<b>${d.c} · ${d.p}</b><br>${MET[metric][2]}<br>CM360: ${fmtN(d.cm)}<br>Plataforma: ${fmtN(d.pl)}<br>VAR: ${pct(d.v)} · ${d.n} líneas`)};r.onmouseleave=hideTT});
@@ -255,15 +260,24 @@ function drawVar(){
 
 const STL={OK:['OK · flight cerrado','ok'],OK_PARTIAL_RUNNING:['En curso (reach parcial)','run'],LONG_FLIGHT:['Flight >90 días · sin reach CM','no'],STARTED_BEFORE_RANGE:['Empezó antes de 2025','no'],NO_REACH_CM:['Sin reach en CM','no'],NOT_MEASURABLE_CM:['CM no mide (Meta)','no'],REVIEW_ABOVE_MAX:['Revisar · sobre el techo','no'],REVIEW_BELOW_MIN:['Revisar · bajo el piso','no'],REVIEW_LOW_REACH:['Revisar · reach muy bajo','no'],PENDING_WINDOW:['Pendiente','no']};
 function drawStatus(){
-  const base=L.filter(r=>(!F.country||r[K.Country]===F.country)&&(!F.platform||r[K.Plataforma]===F.platform)&&(!F.network||r[K.Network_Code]===F.network)&&(!F.brand||brandOf(r)===F.brand)&&(!F.year||yearOf(r)===F.year)&&(!q||matchQ(r)));
-  const agg={};base.forEach(r=>{const k=r[K.Reach_Status_CM]||'?';agg[k]=agg[k]||{n:0,i:0};agg[k].n++;agg[k].i+=r[K.Impressions_CM]||0});
-  const rows=Object.entries(agg).sort((a,b)=>b[1].i-a[1].i);const tot=base.reduce((a,r)=>a+(r[K.Impressions_CM]||0),0);
-  const W_=520,rh=30,H=rows.length*rh+10,mL=190;
-  let s=`<svg viewBox="0 0 ${W_} ${H}" role="img" aria-label="Estado del reach">`;
-  rows.forEach(([k,v],i)=>{const y=5+i*rh,w=(v.i/tot)*(W_-mL-70);const lab=(STL[k]||[k])[0];
-    s+=`<text class="lbl" x="${mL-8}" y="${y+19}" text-anchor="end">${esc(lab)}</text><rect class="bar" x="${mL}" y="${y+6}" width="${Math.max(2,w)}" height="16" fill="${k==='OK'?'#2a78d6':k==='OK_PARTIAL_RUNNING'?'#86b6ef':'#c8c5bf'}" data-k="${k}"/><text class="lbl" x="${mL+Math.max(2,w)+6}" y="${y+19}" style="font-weight:500">${(v.i/tot*100).toFixed(1)}% · ${fmtN(v.n)} líneas</text>`});
-  s+='</svg>';$('#chStatus').innerHTML=s;
-  $('#chStatus').querySelectorAll('rect').forEach(r=>{r.onmousemove=e=>{const v=agg[r.dataset.k];showTT(e,`<b>${(STL[r.dataset.k]||[r.dataset.k])[0]}</b><br>${fmtN(v.n)} líneas · ${fmt(v.i)} impresiones<br>${(v.i/tot*100).toFixed(1)}% de las impresiones CM`)};r.onmouseleave=hideTT});
+  const groups={};cur.forEach(r=>{if(!r[K.Plataforma])return;const k=r[K.Network_Code]||'—';(groups[k]=groups[k]||[]).push(r)});
+  const rows=Object.entries(groups).map(([k,rs])=>{const s=sums(rs,metric);return {k,p:platOf(rs[0]),...s}}).filter(d=>d.n&&d.cm>=1e7&&d.v!=null)
+    .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,12);
+  const box=$('#chStatus');if(!rows.length){box.innerHTML='<div class="empty">Sin datos para el filtro</div>';return}
+  const W_=560,rh=30,H=rows.length*rh+34,mL=150,mR=70;
+  const vmax=Math.min(6,Math.max(.05,...rows.map(d=>d.v))), vmin=Math.max(-1,Math.min(-.05,...rows.map(d=>d.v)));
+  const lo=vmin*1.15,hi=vmax*1.15,x=v=>mL+((Math.max(lo,Math.min(v,hi))-lo)/(hi-lo))*(W_-mL-mR);
+  let s=`<svg viewBox="0 0 ${W_} ${H}" role="img" aria-label="Network codes con mayor variación">`;
+  const span=hi-lo,stepT=span>4?1:span>2?.5:span>.8?.25:span>.4?.1:.05;
+  for(let t=Math.ceil(lo/stepT)*stepT;t<=hi+1e-9;t+=stepT){s+=`<line class="gridline" x1="${x(t)}" x2="${x(t)}" y1="4" y2="${H-26}"/><text x="${x(t)}" y="${H-10}" text-anchor="middle" style="font-size:11px;fill:var(--ink-3)">${pct(+t.toFixed(4)).replace('.0%','%')}</text>`}
+  s+=`<line x1="${x(0)}" x2="${x(0)}" y1="4" y2="${H-26}" stroke="var(--ink-2)" stroke-width="1.5"/>`;
+  rows.forEach((d,i)=>{const y=6+i*rh,x0=x(0),x1=x(d.v);
+    // etiqueta: fuera de la barra; si no cabe (barra pegada al borde), del otro lado del eje
+    let lx=x1+(d.v>=0?5:-5), la=d.v>=0?'start':'end';
+    if(d.v<0&&x1-mL<64){lx=x0+5;la='start'} if(d.v>0&&W_-x1<90){lx=x0-5;la="end"}
+    s+=`<text class="lbl" x="${mL-8}" y="${y+15}" text-anchor="end">${esc(d.k)}</text><rect class="bar" x="${Math.min(x0,x1)}" y="${y+2}" width="${Math.max(2,Math.abs(x1-x0))}" height="18" fill="${PCOLG[d.p]||'#999'}" data-i="${i}"/><text class="lbl" x="${lx}" y="${y+15}" text-anchor="${la}" style="font-size:10.5px">${pct(d.v)}${d.v>hi||d.v<lo?' ›':''}</text>`});
+  s+='</svg>';box.innerHTML=s;
+  box.querySelectorAll('rect').forEach(r=>{r.onmousemove=e=>{const d=rows[+r.dataset.i];showTT(e,`<b>${esc(d.k)} · ${d.p}</b><br>${MET[metric][2]}<br>CM360: ${fmtN(d.cm)}<br>Plataforma: ${fmtN(d.pl)}<br>VAR: ${pct(d.v)} · ${d.n} líneas`)};r.onmouseleave=hideTT});
 }
 
 function drawWeek(){
@@ -294,8 +308,8 @@ function drawWeek(){
 }
 
 // ---- table ----
-const COLS=[['Country','País'],['Plataforma','Plataforma'],['Campana','Campaña'],['Network_Code','Network code'],['Placement','Taxonomía'],['TOOL','Tool'],['Chosen_Frequency','Freq.'],['Impressions_CM','Impr CM','n'],['Impressions_Plataforma','Impr Plat.','n'],['vImpr','VAR','n'],['Reach_CM','Reach CM','n'],['Reach_Plataforma','Reach Plat.','n'],['vReach','VAR','n'],['IIEE_CM','IIEE CM','n'],['IIEE_Plataforma','IIEE Plat.','n'],['vIIEE','VAR','n'],['Fecha_inicio','Inicio'],['Fecha_fin','Fin'],['Reach_Status_CM','Estado CM']];
-const val=(r,k)=>{if(k==='vImpr')return ratio(r,'Impressions_CM','Impressions_Plataforma');if(k==='vReach')return ratio(r,'Reach_CM','Reach_Plataforma');if(k==='vIIEE')return ratio(r,'IIEE_CM','IIEE_Plataforma');return r[K[k]]};
+const COLS=[['Country','País'],['platG','Plataforma'],['Campana','Campaña'],['Network_Code','Network code'],['Placement','Taxonomía'],['TOOL','Tool'],['Chosen_Frequency','Freq.'],['Impressions_CM','Impr CM','n'],['Impressions_Plataforma','Impr Plat.','n'],['vImpr','VAR','n'],['Reach_CM','Reach CM','n'],['Reach_Plataforma','Reach Plat.','n'],['vReach','VAR','n'],['IIEE_CM','IIEE CM','n'],['IIEE_Plataforma','IIEE Plat.','n'],['vIIEE','VAR','n'],['Fecha_inicio','Inicio'],['Fecha_fin','Fin'],['Reach_Status_CM','Estado CM']];
+const val=(r,k)=>{if(k==='platG')return platOf(r);if(k==='vImpr')return ratio(r,'Impressions_CM','Impressions_Plataforma');if(k==='vReach')return ratio(r,'Reach_CM','Reach_Plataforma');if(k==='vIIEE')return ratio(r,'IIEE_CM','IIEE_Plataforma');return r[K[k]]};
 const ratio=(r,a,b)=>{const x=r[K[a]],y=r[K[b]];return x&&y?y/x-1:null};
 $('#tbl thead').innerHTML='<tr>'+COLS.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr>';
 $('#tbl thead').onclick=e=>{const k=e.target.dataset.k;if(!k)return;if(sortK===k)sortD*=-1;else{sortK=k;sortD=-1}drawTable()};
@@ -321,7 +335,7 @@ $('#prev').onclick=()=>{page--;drawTable()};$('#next').onclick=()=>{page++;drawT
 $('#dl').onclick=()=>{const rows=tableRows();
   const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM'];
   const p=v=>v==null?'':(v*100).toFixed(2)+'%';const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
-  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(r[K.Network_Code]),c(r[K.Campana]),c(r[K.Plataforma]||''),c(r[K.Reach_Status_CM])].join(',')));
+  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(r[K.Network_Code]),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM])].join(',')));
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`CM_vs_Plataformas_${DATA.cutoff}${F.country?'_'+F.country:''}${F.platform?'_'+F.platform:''}.csv`;a.click();URL.revokeObjectURL(a.href)};
 
 render();
