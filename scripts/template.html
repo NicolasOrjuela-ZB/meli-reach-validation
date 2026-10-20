@@ -252,6 +252,8 @@ function showTT(e,html){tt.innerHTML=html;tt.style.opacity=1;const x=e.clientX+1
 function hideTT(){tt.style.opacity=0}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+// Dibuja cada SVG al ancho real de su contenedor (1 unidad = 1 px) para que textos y barras no se escalen con la pantalla
+const chartW=(box,fallback)=>Math.max(320,Math.round(box.clientWidth)||fallback);
 function drawVar(){
   const plats=[...new Set(cur.filter(r=>r[K.Plataforma]).map(platOf))].sort(pSort);
   const countries=[...new Set(cur.map(r=>r[K.Country]))].sort();
@@ -259,7 +261,7 @@ function drawVar(){
   const cells=[];countries.forEach(c=>plats.forEach(p=>{const s=sums(cur.filter(r=>r[K.Country]===c&&r[K.Plataforma]&&platOf(r)===p),metric);if(s.n)cells.push({c,p,...s})}));
   const box=$('#chVar');
   if(!cells.length){box.innerHTML='<div class="empty">Sin datos para el filtro</div>';return}
-  const bh=12,rowH=plats.length*(bh+3)+14,W_=760,H=40+countries.length*rowH,mL=50,mR=60,mT=14,mB=30;
+  const bh=12,rowH=plats.length*(bh+3)+14,W_=chartW(box,760),H=40+countries.length*rowH,mL=50,mR=60,mT=14,mB=30;
   const vmax=Math.min(6,Math.max(.05,...cells.map(d=>d.v))), vmin=Math.max(-1,Math.min(-.05,...cells.map(d=>d.v)));
   const lo=vmin*1.15, hi=vmax*1.15;
   const x=v=>mL+((Math.max(lo,Math.min(v,hi))-lo)/(hi-lo))*(W_-mL-mR);
@@ -282,7 +284,7 @@ function drawStatus(){
   const rows=Object.entries(groups).map(([k,rs])=>{const s=sums(rs,metric);return {k,p:platOf(rs[0]),...s}}).filter(d=>d.n&&d.cm>=1e7&&d.v!=null)
     .sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,12);
   const box=$('#chStatus');if(!rows.length){box.innerHTML='<div class="empty">Sin datos para el filtro</div>';return}
-  const W_=560,rh=30,H=rows.length*rh+34,mL=150,mR=70;
+  const W_=chartW(box,560),rh=30,H=rows.length*rh+34,mL=150,mR=70;
   const vmax=Math.min(6,Math.max(.05,...rows.map(d=>d.v))), vmin=Math.max(-1,Math.min(-.05,...rows.map(d=>d.v)));
   const lo=vmin*1.15,hi=vmax*1.15,x=v=>mL+((Math.max(lo,Math.min(v,hi))-lo)/(hi-lo))*(W_-mL-mR);
   let s=`<svg viewBox="0 0 ${W_} ${H}" role="img" aria-label="Network codes con mayor variación">`;
@@ -305,7 +307,7 @@ function drawWeek(){
     const k=w[0];agg[k]=agg[k]||{cm:0,pl:0,n:0};agg[k].cm+=a;agg[k].pl+=b;agg[k].n++})});
   const pts=Object.entries(agg).sort().map(([k,v])=>({k,...v}));
   const box=$('#chWeek');if(!pts.length){box.innerHTML='<div class="empty">Sin datos semanales para el filtro</div>';return}
-  const W_=1100,H=260,mL=56,mR=16,mT=14,mB=34;const max=Math.max(1,...pts.map(p=>Math.max(p.cm,p.pl)));
+  const W_=chartW(box,1100),H=260,mL=56,mR=16,mT=14,mB=34;const max=Math.max(1,...pts.map(p=>Math.max(p.cm,p.pl)));
   const x=i=>mL+i/(pts.length-1||1)*(W_-mL-mR), y=v=>mT+(1-v/max)*(H-mT-mB);
   let s=`<svg viewBox="0 0 ${W_} ${H}" role="img" aria-label="Serie semanal">`;
   for(let t=0;t<=4;t++){const v=max*t/4;s+=`<line class="gridline" x1="${mL}" x2="${W_-mR}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${mL-8}" y="${y(v)+4}" text-anchor="end" style="font-size:11px;fill:var(--ink-3)">${fmt(v)}</text>`}
@@ -359,7 +361,7 @@ $('#dl').onclick=()=>{const rows=tableRows();
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`CM_vs_Plataformas_${DATA.cutoff}${F.country?'_'+F.country:''}${F.platform?'_'+F.platform:''}.csv`;a.click();URL.revokeObjectURL(a.href)};
 
 render();
-window.addEventListener('resize',()=>{});
+let rsz;window.addEventListener('resize',()=>{clearTimeout(rsz);rsz=setTimeout(()=>{drawVar();drawStatus();drawWeek()},150)});
 </script>
 </body>
 </html>
