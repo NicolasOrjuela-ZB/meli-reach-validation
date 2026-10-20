@@ -161,8 +161,10 @@ const pct=v=>v==null||!isFinite(v)?'—':(v>0?'+':'')+(v*100).toFixed(1)+'%';
 const platOf=r=>{const p=r[K.Plataforma];if(p!=='DV360')return p;const t=((r[K.Placement]||'').split('_')[2]||'').toUpperCase();
   if(/(^|-)YT(-|$)|DVYTA|BUMPER/.test(t))return 'DV360 · YouTube';
   if(/^(G-DV|DV-DV)-(DISPLAY|VIDEO|VIDISP|VID-TP|DISP-TP)$/.test(t))return 'DV360 · Open';
-  return 'DV360 · Deals/Direct'};
-const PCOLG={'DV360 · Open':'#2a78d6','DV360 · YouTube':'#e34948','DV360 · Deals/Direct':'#6250d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
+  return 'DV360 · Deals'};
+const PORDER=['TikTok','Pinterest','DV360 · YouTube','DV360 · Open','DV360 · Deals'];
+const pSort=(a,b)=>(PORDER.indexOf(a)+1||99)-(PORDER.indexOf(b)+1||99)||a.localeCompare(b);
+const PCOLG={'DV360 · Open':'#2a78d6','DV360 · YouTube':'#e34948','DV360 · Deals':'#6250d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
 const brandOf=r=>r[K.Advertiser]&&r[K.Advertiser].includes('MercadoPago')?'MP':'ML';
 const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
@@ -180,7 +182,7 @@ function passes(r,skip){
 }
 function refreshOptions(){
   DIMS.forEach(([id,k,get,all])=>{
-    const sel=$('#'+id);const vals=[...new Set(L.filter(r=>passes(r,k)).map(get).filter(Boolean))].sort();
+    const sel=$('#'+id);const vals=[...new Set(L.filter(r=>passes(r,k)).map(get).filter(Boolean))].sort(k==='platform'?pSort:undefined);
     if(F[k]&&!vals.includes(F[k]))F[k]='';
     sel.innerHTML=`<option value="">${all}</option>`+vals.map(v=>`<option value="${v}">${k==='brand'?BRANDNAME[v]||v:v}</option>`).join('');
     sel.value=F[k];
@@ -234,7 +236,7 @@ function hideTT(){tt.style.opacity=0}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function drawVar(){
-  const plats=[...new Set(cur.filter(r=>r[K.Plataforma]).map(platOf))].sort();
+  const plats=[...new Set(cur.filter(r=>r[K.Plataforma]).map(platOf))].sort(pSort);
   const countries=[...new Set(cur.map(r=>r[K.Country]))].sort();
   $('#legPlat').innerHTML=plats.map(p=>`<span><span class="sw" style="background:${PCOLG[p]||'#999'}"></span>${p}</span>`).join('')||'<span style="color:var(--ink-3)">Sin líneas cruzadas en el filtro</span>';
   const cells=[];countries.forEach(c=>plats.forEach(p=>{const s=sums(cur.filter(r=>r[K.Country]===c&&r[K.Plataforma]&&platOf(r)===p),metric);if(s.n)cells.push({c,p,...s})}));
