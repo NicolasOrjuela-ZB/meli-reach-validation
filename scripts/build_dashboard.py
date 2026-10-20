@@ -40,7 +40,7 @@ SELECT placement_id, STRING_AGG(CONCAT(CAST(week_start AS STRING),'|',IFNULL(CAS
 FROM `{DS}.gold_cm_vs_platform_weekly` GROUP BY 1
 """
 
-Q_CUTOFF = f"SELECT MAX(week_end) AS cutoff FROM `{DS}.bronze_cm_reach_weekly`"
+Q_CUTOFF = f"SELECT MAX(report_range_end) AS cutoff FROM `{DS}.bronze_cm_reach_weekly`"
 
 
 def main():
