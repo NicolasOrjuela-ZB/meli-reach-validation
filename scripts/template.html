@@ -98,15 +98,13 @@ td.pl{max-width:360px;overflow:hidden;text-overflow:ellipsis}
     </header>
 
     <section class="filters" aria-label="Filtros">
+      <div class="f"><label for="fYear">Año (inicio)</label><select id="fYear"><option value="">Todos</option></select></div>
       <div class="f"><label for="fCountry">País</label><select id="fCountry"><option value="">Todos</option></select></div>
       <div class="f"><label for="fPlatform">Plataforma</label><select id="fPlatform"><option value="">Todas</option></select></div>
       <div class="f"><label for="fCampaign">Campaña</label><select id="fCampaign"><option value="">Todas</option></select></div>
-      <div class="f"><label for="fNetwork">Network code</label><select id="fNetwork"><option value="">Todos</option></select></div>
       <div class="f"><label for="fPartner">Partner</label><select id="fPartner"><option value="">Todos</option></select></div>
+      <div class="f"><label for="fNetwork">Network code</label><select id="fNetwork"><option value="">Todos</option></select></div>
       <div class="f"><label for="fBrand">Marca</label><select id="fBrand"><option value="">Todas</option></select></div>
-      <div class="f"><label for="fYear">Año (inicio)</label><select id="fYear"><option value="">Todos</option></select></div>
-      <div class="f"><label for="fStatus">Reach CM</label><select id="fStatus"><option value="valid">Con reach válido</option><option value="all">Todas las líneas</option><option value="OK">OK (flight cerrado)</option><option value="OK_PARTIAL_RUNNING">En curso</option><option value="LONG_FLIGHT">Flight &gt;90 días</option><option value="NO_REACH_CM">Sin reach CM</option></select></div>
-      <div class="f"><label for="fMatch">Cruce</label><select id="fMatch"><option value="">Todas</option><option value="matched">Con plataforma</option><option value="CM_ONLY">Solo CM</option><option value="doubtful">Cruce dudoso</option></select></div>
       <div class="f" style="flex:1;min-width:240px"><label for="q">Buscar taxonomía / tool / placement ID</label><input type="search" id="q" placeholder="Ej. 27057035, PINTEREST-SPOT-HOME, MUNDIAL…"></div>
       <button class="btn" id="reset">Limpiar</button>
       <button class="btn primary" id="dl">Descargar tabla (CSV)</button>
@@ -202,8 +200,8 @@ function refreshOptions(){
     sel.value=F[k];
   });
 }
-[['fCountry','country'],['fPlatform','platform'],['fCampaign','campaign'],['fNetwork','network'],['fPartner','partner'],['fBrand','brand'],['fYear','year'],['fStatus','status'],['fMatch','match']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{F[k]=e.target.value;page=0;render()}));
-$('#reset').onclick=()=>{Object.assign(F,{country:'',platform:'',campaign:'',network:'',partner:'',brand:'',year:'',status:'valid',match:''});['fCountry','fPlatform','fCampaign','fNetwork','fPartner','fBrand','fYear','fMatch'].forEach(id=>$('#'+id).value='');$('#fStatus').value='valid';$('#q').value='';q='';page=0;render()};
+[['fCountry','country'],['fPlatform','platform'],['fCampaign','campaign'],['fNetwork','network'],['fPartner','partner'],['fBrand','brand'],['fYear','year']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{F[k]=e.target.value;page=0;render()}));
+$('#reset').onclick=()=>{Object.assign(F,{country:'',platform:'',campaign:'',network:'',partner:'',brand:'',year:'',status:'valid',match:''});['fCountry','fPlatform','fCampaign','fNetwork','fPartner','fBrand','fYear'].forEach(id=>$('#'+id).value='');$('#q').value='';q='';page=0;render()};
 let metric='impr',wmetric='iiee',q='',page=0,sortK='Impressions_CM',sortD=-1;
 $('#segMetric').onclick=e=>{if(!e.target.dataset.m)return;metric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawVar();drawStatus()};
 $('#segWeek').onclick=e=>{if(!e.target.dataset.m)return;wmetric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawWeek()};
@@ -237,11 +235,11 @@ function render(){refreshOptions();cur=filtered();drawKpis();drawVar();drawStatu
 function drawKpis(){
   const el=$('#kpis');el.innerHTML='';document.querySelectorAll('.plname').forEach(e=>e.textContent=F.platform||'Plataforma');
   ['impr','reach','iiee'].forEach(m=>{const s=sums(cur,m);
-    el.insertAdjacentHTML('beforeend',`<div class="card kpi"><h3>${MET[m][2]}</h3><div class="row">
+    el.insertAdjacentHTML('beforeend',`<div class="card kpi"><h3>${MET[m][2]}${m==='reach'?'*':''}</h3><div class="row">
       <div><span class="lab"><span class="dot" style="background:var(--s-cm)"></span>CM360</span><span class="num">${fmt(s.cm)}</span></div>
       <div><span class="lab"><span class="dot" style="background:var(--s-pl)"></span>${F.platform||'Plataforma'}</span><span class="num">${fmt(s.pl)}</span></div>
       <div><span class="lab">VAR</span><span class="var ${s.v>0?'pos':s.v<0?'neg':''}">${pct(s.v)}</span></div></div>
-      <div class="hint">${fmtN(s.n)} líneas con dato en ambos lados</div></div>`)});
+      <div class="hint">${fmtN(s.n)} líneas con dato en ambos lados</div>${m==='reach'?'<div class="hint">* Suma del reach de cada taxonomía (no es un reach deduplicado entre líneas). Solo líneas con reach CM válido.</div>':''}</div>`)});
   const matched=cur.filter(r=>r[K.Plataforma]&&!doubtful(r)).length, run=cur.filter(r=>r[K.En_curso]).length, dub=cur.filter(doubtful).length;
   el.insertAdjacentHTML('beforeend',`<div class="card kpi"><h3>Líneas</h3><div class="row"><div><span class="lab">En el filtro</span><span class="num">${fmtN(cur.length)}</span></div><div><span class="lab">Cruzadas con plataforma</span><span class="num">${fmtN(matched)}</span></div><div><span class="lab">En curso</span><span class="num">${fmtN(run)}</span></div></div><div class="hint">${cur.length?Math.round(matched/cur.length*100):0}% con contraparte en plataforma${dub?` · ${dub} cruces dudosos excluidos`:''}</div></div>`);
 }
