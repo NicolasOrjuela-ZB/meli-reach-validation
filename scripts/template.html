@@ -294,7 +294,7 @@ function drawWeek(){
 }
 
 // ---- table ----
-const COLS=[['Country','País'],['Plataforma','Plataforma'],['Placement','Placement'],['TOOL','Tool'],['Chosen_Frequency','Freq.'],['Impressions_CM','Impr CM','n'],['Impressions_Plataforma','Impr Plat.','n'],['vImpr','VAR','n'],['Reach_CM','Reach CM','n'],['Reach_Plataforma','Reach Plat.','n'],['vReach','VAR','n'],['IIEE_CM','IIEE CM','n'],['IIEE_Plataforma','IIEE Plat.','n'],['vIIEE','VAR','n'],['Fecha_inicio','Inicio'],['Fecha_fin','Fin'],['Network_Code','Network'],['Campana','Campaña'],['Reach_Status_CM','Estado CM']];
+const COLS=[['Country','País'],['Plataforma','Plataforma'],['Campana','Campaña'],['Network_Code','Network code'],['Placement','Taxonomía'],['TOOL','Tool'],['Chosen_Frequency','Freq.'],['Impressions_CM','Impr CM','n'],['Impressions_Plataforma','Impr Plat.','n'],['vImpr','VAR','n'],['Reach_CM','Reach CM','n'],['Reach_Plataforma','Reach Plat.','n'],['vReach','VAR','n'],['IIEE_CM','IIEE CM','n'],['IIEE_Plataforma','IIEE Plat.','n'],['vIIEE','VAR','n'],['Fecha_inicio','Inicio'],['Fecha_fin','Fin'],['Reach_Status_CM','Estado CM']];
 const val=(r,k)=>{if(k==='vImpr')return ratio(r,'Impressions_CM','Impressions_Plataforma');if(k==='vReach')return ratio(r,'Reach_CM','Reach_Plataforma');if(k==='vIIEE')return ratio(r,'IIEE_CM','IIEE_Plataforma');return r[K[k]]};
 const ratio=(r,a,b)=>{const x=r[K[a]],y=r[K[b]];return x&&y?y/x-1:null};
 $('#tbl thead').innerHTML='<tr>'+COLS.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr>';
