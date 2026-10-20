@@ -42,6 +42,11 @@ FROM `{DS}.gold_cm_vs_platform_weekly` GROUP BY 1
 
 Q_CUTOFF = f"SELECT MAX(report_range_end) AS cutoff FROM `{DS}.bronze_cm_reach_weekly`"
 
+Q_NC = f"""
+SELECT network_code, network_code_std, IFNULL(plataforma_compra,'') plataforma_compra, IFNULL(partner,'') partner, IFNULL(formato,'') formato, IFNULL(implementation,'') implementation
+FROM `{DS}.silver_taxonomy_network_codes`
+"""
+
 
 def main():
     client = bigquery.Client(project=PROJECT)
@@ -49,6 +54,8 @@ def main():
     weekly = [dict(r) for r in client.query(Q_WEEKLY).result()]
     wl = {r["placement_id"]: r["w"] for r in client.query(Q_WEEKLY_LINES).result()}
     cutoff = next(iter(client.query(Q_CUTOFF).result()))["cutoff"]
+    nc = {r["network_code"]: [r["network_code_std"], r["plataforma_compra"], r["partner"], r["formato"], r["implementation"]]
+          for r in client.query(Q_NC).result()}
     if not lines or not weekly:
         sys.exit("Sin datos: no se regenera el dashboard")
 
@@ -60,7 +67,7 @@ def main():
     L = [[cell(r.get(k)) for k in KEYS] for r in lines]
     W = [[w["country"], w["platform"], cell(w["week_start"]), w["impr_cm_m"], w["impr_pl"], w["reach_cm_m"], w["reach_pl"],
           w["iiee_cm_m"], w["iiee_pl"], w["lines"], w["lines_m"]] for w in weekly]
-    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "cutoff": cell(cutoff),
+    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "nc": nc, "cutoff": cell(cutoff),
                        "generated": datetime.date.today().isoformat()}, separators=(",", ":"), ensure_ascii=False)
     html = open(TEMPLATE, encoding="utf-8").read()
     assert "/*__DATA__*/" in html, "template.html sin marcador /*__DATA__*/"
