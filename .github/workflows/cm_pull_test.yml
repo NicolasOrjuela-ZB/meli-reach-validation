@@ -1,0 +1,30 @@
+name: Prueba descarga CM360 por API
+
+on:
+  workflow_dispatch:         # solo a mano: descarga un file ya generado y hace dry-run, no carga ni publica
+
+permissions:
+  contents: read
+
+jobs:
+  cm-pull-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Credencial GCP
+        run: |
+          echo '${{ secrets.GCP_CREDENTIALS }}' > "$RUNNER_TEMP/gcp.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp.json" >> "$GITHUB_ENV"
+
+      - name: Descargar file de CM y dry-run
+        run: |
+          python scripts/cm_pull.py weekly --no-load --file 5939775651
+          head -12 downloads/*.csv
