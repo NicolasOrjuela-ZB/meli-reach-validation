@@ -5,3 +5,5 @@ __pycache__/
 !package.json
 data/
 downloads/
+client_secret.json
+cm_token.json

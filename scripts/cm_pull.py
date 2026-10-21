@@ -15,7 +15,8 @@ En Actions: secret GCP_CREDENTIALS (el mismo JSON de ADC) en GOOGLE_APPLICATION_
 """
 import datetime as dt, os, sys, time
 import google.auth, urllib.request, urllib.error
-from google.auth.transport.requests import AuthorizedSession
+from google.auth.transport.requests import AuthorizedSession, Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,8 +31,25 @@ DOWNLOADS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 POLL_SECONDS, MAX_WAIT_MIN = 30, 45
 
 
-def service():
+CM_TOKEN = os.environ.get("CM_TOKEN_JSON") or os.path.join(os.path.dirname(DOWNLOADS), "cm_token.json")
+
+
+def cm_credentials():
+    """Token OAuth del cliente "cm_pull" (scripts/cm_auth.py) si existe; si no, el ADC como hasta ahora.
+    Solo para la API de CM360: load_cm (BigQuery) sigue usando el ADC."""
+    if os.path.exists(CM_TOKEN):
+        creds = Credentials.from_authorized_user_file(CM_TOKEN, scopes=["https://www.googleapis.com/auth/dfareporting"])
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        print(f"[auth] token OAuth {os.path.basename(CM_TOKEN)}", flush=True)
+        return creds
     creds, _ = google.auth.default(scopes=SCOPES)
+    print("[auth] ADC", flush=True)
+    return creds
+
+
+def service():
+    creds = cm_credentials()
     return build("dfareporting", API_VERSION, credentials=creds, cache_discovery=False), creds
 
 
