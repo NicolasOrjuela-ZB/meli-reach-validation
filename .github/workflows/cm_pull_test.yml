@@ -1,7 +1,9 @@
 name: Prueba descarga CM360 por API
 
 on:
-  workflow_dispatch:         # solo a mano: descarga un file ya generado y hace dry-run, no carga ni publica
+  workflow_dispatch:         # descarga un file ya generado y hace dry-run, no carga ni publica
+  schedule:
+    - cron: "0 13 * * *"     # diario 08:00 America/Bogota (13:00 UTC): sondea si Google ya arregló la descarga
 
 permissions:
   contents: read
@@ -19,10 +21,12 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Credencial GCP
+      - name: Credenciales (token OAuth de CM + ADC para fallback)
         run: |
           echo '${{ secrets.GCP_CREDENTIALS }}' > "$RUNNER_TEMP/gcp.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp.json" >> "$GITHUB_ENV"
+          echo '${{ secrets.CM_TOKEN_JSON }}' > "$RUNNER_TEMP/cm_token.json"
+          echo "CM_TOKEN_JSON=$RUNNER_TEMP/cm_token.json" >> "$GITHUB_ENV"
 
       - name: Descargar file de CM y dry-run
         run: |
