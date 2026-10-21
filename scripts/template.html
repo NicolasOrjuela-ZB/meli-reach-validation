@@ -165,7 +165,7 @@ const doubtful=r=>{const src=r[K.Plataforma];if(!src)return false;const i=ncInfo
 const WL={};Object.entries(DATA.wl||{}).forEach(([pid,str])=>{WL[pid]=str.split(';').map(x=>{const p=x.split('|');return [p[0],...p.slice(1).map(v=>v===''?null:+v)]})});
 const PCOL={DV360:'var(--p-dv360)',Pinterest:'var(--p-pinterest)',TikTok:'var(--p-tiktok)'};
 const PHEX={DV360:'#2a78d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
-const VALID=new Set(['OK','OK_PARTIAL_RUNNING']);
+const VALID=new Set(['OK','OK_PARTIAL_RUNNING','PENDING_TOOL_REACH']);
 const $=s=>document.querySelector(s);
 const fmt=n=>n==null?'—':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+' B':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+' M':Math.abs(n)>=1e3?(n/1e3).toFixed(0)+' K':String(n);
 const fmtN=n=>n==null?'—':Number(n).toLocaleString('es-CO');
@@ -276,7 +276,7 @@ function drawVar(){
   box.querySelectorAll('rect').forEach(r=>{r.onmousemove=e=>{const d=cells[+r.dataset.i];showTT(e,`<b>${d.c} · ${d.p}</b><br>${MET[metric][2]}<br>CM360: ${fmtN(d.cm)}<br>Plataforma: ${fmtN(d.pl)}<br>VAR: ${pct(d.v)} · ${d.n} líneas`)};r.onmouseleave=hideTT});
 }
 
-const STL={OK:['OK · flight cerrado','ok'],OK_PARTIAL_RUNNING:['En curso (reach parcial)','run'],LONG_FLIGHT:['Flight >90 días · sin reach CM','no'],STARTED_BEFORE_RANGE:['Empezó antes de 2025','no'],NO_REACH_CM:['Sin reach en CM','no'],NOT_MEASURABLE_CM:['CM no mide (Meta)','no'],REVIEW_ABOVE_MAX:['Revisar · sobre el techo','no'],REVIEW_BELOW_MIN:['Revisar · bajo el piso','no'],REVIEW_LOW_REACH:['Revisar · reach muy bajo','no'],PENDING_WINDOW:['Pendiente','no']};
+const STL={OK:['OK · flight cerrado','ok'],OK_PARTIAL_RUNNING:['En curso (reach parcial)','run'],PENDING_TOOL_REACH:['Multi-placement · reach por consolidar','run'],LONG_FLIGHT:['Flight >90 días · sin reach CM','no'],STARTED_BEFORE_RANGE:['Empezó antes de 2025','no'],NO_REACH_CM:['Sin reach en CM','no'],NOT_MEASURABLE_CM:['CM no mide (Meta)','no'],REVIEW_ABOVE_MAX:['Revisar · sobre el techo','no'],REVIEW_BELOW_MIN:['Revisar · bajo el piso','no'],REVIEW_LOW_REACH:['Revisar · reach muy bajo','no'],PENDING_WINDOW:['Pendiente','no']};
 function drawStatus(){
   const groups={};cur.forEach(r=>{if(!r[K.Plataforma])return;const k=ncOf(r);(groups[k]=groups[k]||[]).push(r)});
   const rows=Object.entries(groups).map(([k,rs])=>{const s=sums(rs,metric);return {k,p:platOf(rs[0]),...s}}).filter(d=>d.n&&d.cm>=1e7&&d.v!=null)
