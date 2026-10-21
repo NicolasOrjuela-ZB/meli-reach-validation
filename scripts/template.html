@@ -107,7 +107,7 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
       <div class="f"><label for="fBrand">Marca</label><select id="fBrand"><option value="">Todas</option></select></div>
       <div class="f" style="flex:1;min-width:240px"><label for="q">Buscar taxonomía / tool / placement ID</label><input type="search" id="q" placeholder="Ej. 27057035, PINTEREST-SPOT-HOME, MUNDIAL…"></div>
       <button class="btn" id="reset">Limpiar</button>
-      <button class="btn primary" id="dl">Descargar tabla (CSV)</button>
+      <button class="btn primary" id="dl">Descargar tabla (CSV, todas las líneas)</button>
     </section>
 
     <section class="grid kpis" id="kpis"></section>
@@ -331,7 +331,8 @@ const val=(r,k)=>{if(k==='platG')return platOf(r);if(k==='nc')return ncOf(r);if(
 const ratio=(r,a,b)=>{const x=r[K[a]],y=r[K[b]];return x&&y?y/x-1:null};
 $('#tbl thead').innerHTML='<tr>'+COLS.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr>';
 $('#tbl thead').onclick=e=>{const k=e.target.dataset.k;if(!k)return;if(sortK===k)sortD*=-1;else{sortK=k;sortD=-1}drawTable()};
-function tableRows(){let rows=cur;
+function tableRows(){return sortRows(cur)}
+function sortRows(rows){
   return rows.slice().sort((a,b)=>{const x=val(a,sortK),y=val(b,sortK);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*sortD})}
 const PAGE=50;
 function drawTable(){const rows=tableRows();const n=rows.length;page=Math.min(page,Math.max(0,Math.ceil(n/PAGE)-1));
@@ -352,7 +353,8 @@ function drawTable(){const rows=tableRows();const n=rows.length;page=Math.min(pa
 $('#prev').onclick=()=>{page--;drawTable()};$('#next').onclick=()=>{page++;drawTable()};
 
 // ---- CSV (client structure) ----
-$('#dl').onclick=()=>{const rows=tableRows();
+// La descarga respeta los filtros y la búsqueda, pero incluye todas las líneas (no solo las de reach CM válido)
+$('#dl').onclick=()=>{const prev=F.status;F.status='all';const rows=sortRows(filtered());F.status=prev;
   const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato'];
   const p=v=>v==null?'':(v*100).toFixed(2)+'%';const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
   const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r))].join(',')));
