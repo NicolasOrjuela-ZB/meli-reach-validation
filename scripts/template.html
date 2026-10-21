@@ -70,7 +70,7 @@ th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
 th.on{color:var(--ink)}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-td.pl{max-width:360px;overflow:hidden;text-overflow:ellipsis}
+td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
 .tablewrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:8px;-webkit-overflow-scrolling:touch}
 .pager{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--ink-2);flex-wrap:wrap}
 .pill{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:600;background:var(--surface-2);color:var(--ink-2)}
@@ -341,7 +341,7 @@ function drawTable(){const rows=tableRows();const n=rows.length;page=Math.min(pa
     if(c[0].startsWith('v'))t=`<span class="${v>0?'pos':v<0?'neg':''}" style="font-weight:600">${pct(v)}</span>`;
     else if(c[2]==='n')t=fmtN(v);
     else if(c[0]==='Reach_Status_CM'){const m=STL[v]||[v,'no'];t=`<span class="pill ${m[1]}">${esc(m[0])}</span>`}
-    else if(c[0]==='Placement')t=`<span title="${esc(v||'')}">${esc(v||'')}</span>`;
+    else if(c[0]==='Placement')t=esc(v||'').replace(/_/g,'_<wbr>');
     else if(c[0]==='platG')t=doubtful(r)?`<span title="Cruce dudoso: el network code (${esc(ncOf(r))}) no corresponde a esta plataforma" style="color:var(--bad)">${esc(v)} ⚠</span>`:esc(v);
     else if(c[0]==='nc')t=ncStd(r)?esc(v):`<span title="Código no está en el maestro de taxonomía" style="color:var(--bad)">${esc(v)} ⚠</span>`;
     else t=esc(v??'—');
