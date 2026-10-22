@@ -245,8 +245,9 @@ const partnerOf=r=>{const i=ncInfo(r);return i&&i[2]?i[2]:'—'};
 const formatoOf=r=>{const i=ncInfo(r);return i&&i[3]?i[3]:'—'};
 const campOf=r=>r[K.Campana]||'—';
 // Cruce dudoso: la plataforma de compra según el maestro no coincide con la fuente de datos de plataforma (p. ej. tool repetido entre plataformas)
-const doubtful=r=>{const src=r[K.Plataforma];if(!src)return false;const i=ncInfo(r);const pc=i&&i[1]?i[1]:'';if(!pc)return false;
-  if(src==='Pinterest')return pc!=='PINTEREST';if(src==='TikTok')return pc!=='TIKTOK';if(src==='DV360')return ['PINTEREST','TIKTOK','META','KWAI'].includes(pc);return false};
+// Cruce dudoso: lo marca la vista (taxonomía que no corresponde a la plataforma, o una línea que cruzaba
+// con varias plataformas sin que el maestro resuelva cuál). Queda fuera de todas las sumas.
+const doubtful=r=>!!r[K.Cruce_Dudoso];
 const WL={};Object.entries(DATA.wl||{}).forEach(([pid,str])=>{WL[pid]=str.split(';').map(x=>{const p=x.split('|');return [p[0],...p.slice(1).map(v=>v===''?null:+v)]})});
 const PCOL={DV360:'var(--p-dv360)',Pinterest:'var(--p-pinterest)',TikTok:'var(--p-tiktok)'};
 const PHEX={DV360:'#2a78d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
@@ -435,7 +436,7 @@ function drawTable(){const rows=tableRows();const n=rows.length;page=Math.min(pa
     else if(c[2]==='n')t=fmtN(v);
     else if(c[0]==='Reach_Status_CM'){const m=STL[v]||[v,'no'];t=`<span class="pill ${m[1]}">${esc(m[0])}</span>`}
     else if(c[0]==='Placement')t=esc(v||'').replace(/_/g,'_<wbr>');
-    else if(c[0]==='platG')t=doubtful(r)?`<span title="Cruce dudoso: el network code (${esc(ncOf(r))}) no corresponde a esta plataforma" style="color:var(--bad)">${esc(v)} ⚠</span>`:esc(v);
+    else if(c[0]==='platG')t=doubtful(r)?`<span title="Cruce dudoso: el network code (${esc(ncOf(r))}) no corresponde a esta plataforma, o la línea cruzaba con varias plataformas sin poder resolver cuál. Excluida de las sumas." style="color:var(--bad)">${esc(v)} ⚠</span>`:esc(v);
     else if(c[0]==='nc')t=ncStd(r)?esc(v):`<span title="Código no está en el maestro de taxonomía" style="color:var(--bad)">${esc(v)} ⚠</span>`;
     else t=esc(v??'—');
     return `<td class="${c[2]||''}${c[0]==='Placement'?' pl':''}">${t}</td>`}).join('')+'</tr>').join('')||'<tr><td colspan="21" class="empty">Sin líneas para el filtro</td></tr>';

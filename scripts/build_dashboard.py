@@ -17,7 +17,8 @@ OUT = os.path.join(ROOT, "docs", "index.html")
 
 KEYS = ["Advertiser", "Placement", "Placement_ID", "TOOL", "Country", "Chosen_Frequency",
         "Impressions_CM", "Impressions_Plataforma", "Reach_CM", "Reach_Plataforma", "IIEE_CM", "IIEE_Plataforma",
-        "Fecha_inicio", "Fecha_fin", "Network_Code", "Campana", "Plataforma", "Match", "Reach_Status_CM", "En_curso"]
+        "Fecha_inicio", "Fecha_fin", "Network_Code", "Campana", "Plataforma", "Match", "Reach_Status_CM", "En_curso",
+        "Cruce_Dudoso"]
 
 Q_LINES = f"""
 SELECT {", ".join(KEYS)}
