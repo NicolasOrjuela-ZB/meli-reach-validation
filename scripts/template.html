@@ -199,8 +199,8 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
     </section>
 
     <section class="card" style="margin-top:14px">
-      <div class="cardhead"><div><h3>Misma tool, distinta taxonomía</h3><div class="hint">Tools donde CM y la plataforma usan nombres distintos: qué taxonomías tiene cada lado.</div></div></div>
-      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th>Tool</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n">Impr CM</th><th class="n">Impr Plat.</th><th class="n">VAR</th></tr></thead><tbody></tbody></table></div>
+      <div class="cardhead"><div><h3>Detalle por tool</h3><div class="hint">Todas las líneas del filtro agrupadas por tool (las que no tienen tool van por nombre): qué taxonomías tiene cada lado. Si eliges tipos de cruce, solo esos.</div></div></div>
+      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th>Tool</th><th>Tipo de cruce</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n">Impr CM</th><th class="n">Impr Plat.</th><th class="n">VAR</th></tr></thead><tbody></tbody></table></div>
       <div class="pager" id="iToolsInfo"></div>
     </section>
     </div><!-- /vImp -->
@@ -512,12 +512,14 @@ function iShare(){
     const sh=v/tot;return `<div class="shbar"><i style="width:${(sh/maxSh*58).toFixed(1)}%;background:${col}"></i><span><b>${(sh*100).toFixed(1)}%</b> · ${fmt(v)}</span></div>`};
   box.innerHTML=rows.map(r=>`<div class="shrow"><div class="shlbl">${esc(r.t)}</div><div>${bar(r.cm,cmT,'var(--s-cm)')}${bar(r.pl,plT,'var(--s-pl)')}</div></div>`).join('');
 }
-function iToolsTbl(){const g={};cur3.forEach(l=>{if(l.mt!=='Misma tool, distinta taxo'||!l.tool)return;const s=lSum(l);const o=g[l.tool]=g[l.tool]||{cm:0,pl:0,cn:new Set(),pn:new Set()};
-    if(l.side===0){o.cm+=s;o.cn.add(l.name)}else{o.pl+=s;o.pn.add(l.name)}});
-  const rows=Object.entries(g).map(([t,o])=>({t,...o,v:o.cm?o.pl/o.cm-1:null})).sort((a,b)=>Math.max(b.cm,b.pl)-Math.max(a.cm,a.pl)).slice(0,100);
+function iToolsTbl(){const g={};
+  cur3.forEach(l=>{if(!crSel(l))return;const s=lSum(l);if(!s)return;
+    const key=l.tool||'·'+l.name;const o=g[key]=g[key]||{t:l.tool,cm:0,pl:0,cn:new Set(),pn:new Set(),mt:new Set()};
+    o.mt.add(l.mt);if(l.side===0){o.cm+=s;o.cn.add(l.name)}else{o.pl+=s;o.pn.add(l.name)}});
+  const rows=Object.values(g).map(o=>({...o,v:o.cm&&o.pl?o.pl/o.cm-1:null})).sort((a,b)=>Math.max(b.cm,b.pl)-Math.max(a.cm,a.pl)).slice(0,100);
   const names=st=>{const a=[...st];return (a.slice(0,4).map(n=>`<div>${esc(n)}</div>`).join('')+(a.length>4?`<div style="color:var(--ink-3)">+${a.length-4} más</div>`:''))||'—'};
-  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t)}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Sin tools con taxonomías distintas en el filtro</td></tr>';
-  $('#iToolsInfo').textContent=`${Object.keys(g).length} tools con taxonomía distinta · mostrando ${rows.length}`}
+  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin líneas para el filtro</td></tr>';
+  $('#iToolsInfo').textContent=`${Object.keys(g).length} tools/líneas · mostrando ${rows.length}, ordenados por impresiones`}
 if(IMPD){
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
   $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
