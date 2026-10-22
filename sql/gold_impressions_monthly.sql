@@ -67,17 +67,20 @@ cls AS (
       WHEN (side='PLATAFORMA' AND source_platform='DV360') OR plat='DV360'
            OR (plat IS NULL AND REGEXP_CONTAINS(code_s, r'^(G-DV|DV-DV|DV|G-G-DV)-')) THEN
         CASE
+          WHEN REGEXP_CONTAINS(IFNULL(code3,''), r'^DDL(-|$)') THEN 'DV360 · Deals'
           WHEN REGEXP_CONTAINS(code_eff, r'-YT(-|$)|BUMPER|MASTHEAD') OR REGEXP_CONTAINS(impl_u, r'YOUTUBE') THEN 'DV360 · YouTube'
           WHEN REGEXP_CONTAINS(code_eff, r'DOOH') THEN 'DV360 · DOOH'
           WHEN STARTS_WITH(impl_u,'DV/OPEN') OR impl_u LIKE 'TOP PERFORMER%'
                OR REGEXP_CONTAINS(code_eff, r'^(G-DV|DV-DV)-(DISPLAY|VIDEO|AUDIO|VIDISP|VID-TP|DISP-TP|DL-NAT)$') THEN 'DV360 · Open'
           WHEN REGEXP_CONTAINS(code_eff, r'^G-DV-(DL|DEAL)-') THEN 'DV360 · Deals'
           ELSE 'DV360 · Otros' END
+      -- DDL-* son deals comprados vía DV360: van a Deals aunque el maestro los marque DIRECTO
+      WHEN REGEXP_CONTAINS(IFNULL(code3,''), r'^DDL(-|$)') THEN 'DV360 · Deals'
       WHEN plat='PINTEREST' OR REGEXP_CONTAINS(IFNULL(code3,''), r'^(PINTEREST|PINT)-') THEN 'Pinterest'
       WHEN plat='TIKTOK' OR REGEXP_CONTAINS(IFNULL(code3,''), r'^(TT|TTK)-') THEN 'TikTok'
       WHEN plat='META' OR REGEXP_CONTAINS(IFNULL(code3,''), r'^(META|IG|FB)-') THEN 'Meta'
       WHEN plat='TWITTER' OR REGEXP_CONTAINS(code_s, r'^(TW|TWT|X)(-|$)') THEN 'Twitter'
-      WHEN plat='DIRECTO' OR REGEXP_CONTAINS(IFNULL(code3,''), r'^(DD|MEDIOS|DDL)-') THEN 'Medios directos'
+      WHEN plat='DIRECTO' OR REGEXP_CONTAINS(IFNULL(code3,''), r'^(DD|MEDIOS)-') THEN 'Medios directos'
       WHEN plat IS NOT NULL THEN INITCAP(plat)
       ELSE 'Sin clasificar' END AS platform_group
   FROM grp g),
