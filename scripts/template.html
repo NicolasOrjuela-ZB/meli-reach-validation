@@ -152,6 +152,7 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
     <div id="vImp" style="display:none">
     <section class="filters" aria-label="Filtros de impresiones">
       <div class="f"><label for="iYear">Año</label><select id="iYear"><option value="">Todos</option></select></div>
+      <div class="f"><label for="iMonth">Mes</label><select id="iMonth"><option value="">Todos</option></select></div>
       <div class="f"><label for="iCountry">País</label><select id="iCountry"><option value="">Todos</option></select></div>
       <div class="f"><label for="iPlatform">Plataforma</label><select id="iPlatform"><option value="">Todas</option></select></div>
       <div class="f"><label for="iCampaign">Campaña</label><select id="iCampaign"><option value="">Todas</option></select></div>
@@ -404,7 +405,7 @@ $('#dl').onclick=()=>{const prev=F.status;F.status='all';const rows=sortRows(fil
 
 // ===== Pestaña Impresiones (gold_impressions_monthly, embebido columnar en DATA.imp) =====
 const IMPD=DATA.imp||null;let impInit=false,IM=null,cur3=[];
-const F3={country:'',pg:'',camp:'',partner:'',nc:'',brand:'',year:'',cruce:'tool',q:''};
+const F3={country:'',pg:'',camp:'',partner:'',nc:'',brand:'',year:'',month:'',cruce:'tool',q:''};
 const CRUCE={tool:['Misma tool y taxo','Misma tool, distinta taxo'],tooltaxo:['Misma tool y taxo'],dist:['Misma tool, distinta taxo']};
 const CRLBL={tool:'Por tool',tooltaxo:'Tool + taxo',dist:'Misma tool, distinta taxo'};
 const PG_ORDER=['TikTok','Pinterest','DV360 · YouTube','DV360 · Open','DV360 · Deals','DV360 · DOOH','DV360 · Otros','Medios directos','Meta','Google Ads','Twitter','Sin clasificar'];
@@ -413,7 +414,7 @@ function impDecode(){const D=IMPD.dims;IM={months:IMPD.months,
   lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],
     ser:a[10]?a[10].split(',').map(s=>{const p=s.split(':');return [+p[0],parseInt(p[1],36)]}):[]}))};
   IM.years=[...new Set(IM.months.map(m=>m.slice(0,4)))].sort()}
-const mOk=i=>!F3.year||IM.months[i].slice(0,4)===F3.year;
+const mOk=i=>(!F3.year||IM.months[i].slice(0,4)===F3.year)&&(!F3.month||IM.months[i]===F3.month);
 const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
 const inCr=(l,cr)=>CRUCE[cr||F3.cruce].includes(l.mt);
 const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas']];
@@ -421,8 +422,10 @@ const iMatchQ=l=>F3.q.split(/\s+/).every(t=>[l.name,l.tool,l.nc,l.camp].join(' '
 function iPass(l,skip){for(const [,k,get] of IDIMS){if(k===skip)continue;if(F3[k]&&get(l)!==F3[k])return false}if(F3.q&&!iMatchQ(l))return false;return true}
 function iOpts(){IDIMS.forEach(([id,k,get,all])=>{const sel=$('#'+id);const vals=[...new Set(IM.lines.filter(l=>iPass(l,k)).map(get).filter(Boolean))].sort(k==='pg'?pgSort2:undefined);
   if(F3[k]&&!vals.includes(F3[k]))F3[k]='';sel.innerHTML=`<option value="">${all}</option>`+vals.map(v=>`<option value="${v}">${k==='brand'?(BRANDNAME[v]||v):v}</option>`).join('');sel.value=F3[k]});
-  const ys=$('#iYear');ys.innerHTML='<option value="">Todos</option>'+IM.years.map(y=>`<option>${y}</option>`).join('');ys.value=F3.year}
-function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!F3.year||l.ser.some(x=>mOk(x[0]))));iKpis();iMonthly();iMxCountry();iMxPg();iToolsTbl()}
+  const ys=$('#iYear');ys.innerHTML='<option value="">Todos</option>'+IM.years.map(y=>`<option>${y}</option>`).join('');ys.value=F3.year;
+  const mv=IM.months.filter(m=>!F3.year||m.slice(0,4)===F3.year);if(F3.month&&!mv.includes(F3.month))F3.month='';
+  const ms=$('#iMonth');ms.innerHTML='<option value="">Todos</option>'+mv.map(m=>`<option>${m}</option>`).join('');ms.value=F3.month}
+function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!(F3.year||F3.month)||l.ser.some(x=>mOk(x[0]))));iKpis();iMonthly();iMxCountry();iMxPg();iToolsTbl()}
 const pctN=(a,b)=>b?(a/b*100).toFixed(1)+'%':'—';
 const kpiCard=(t,num,hint)=>`<div class="card kpi"><h3>${t}</h3><div class="row"><div><span class="num">${num}</span></div></div><div class="hint">${hint}</div></div>`;
 function iKpis(){let cmT=0,plT=0,cmX=0,plX=0;
@@ -469,9 +472,9 @@ function iToolsTbl(){const g={};cur3.forEach(l=>{if(l.mt!=='Misma tool, distinta
   $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t)}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Sin tools con taxonomías distintas en el filtro</td></tr>';
   $('#iToolsInfo').textContent=`${Object.keys(g).length} tools con taxonomía distinta · mostrando ${rows.length}`}
 if(IMPD){
-  [['iCountry','country'],['iPlatform','pg'],['iCampaign','camp'],['iPartner','partner'],['iNetwork','nc'],['iBrand','brand'],['iYear','year'],['iCruce','cruce']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{F3[k]=e.target.value;iRender()}));
+  [['iCountry','country'],['iPlatform','pg'],['iCampaign','camp'],['iPartner','partner'],['iNetwork','nc'],['iBrand','brand'],['iYear','year'],['iMonth','month'],['iCruce','cruce']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{F3[k]=e.target.value;iRender()}));
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
-  $('#iReset').onclick=()=>{Object.assign(F3,{country:'',pg:'',camp:'',partner:'',nc:'',brand:'',year:'',cruce:'tool',q:''});$('#iCruce').value='tool';$('#iq').value='';iRender()};
+  $('#iReset').onclick=()=>{Object.assign(F3,{country:'',pg:'',camp:'',partner:'',nc:'',brand:'',year:'',month:'',cruce:'tool',q:''});$('#iCruce').value='tool';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
     const head=['Lado','País','Marca','Plataforma','Tipo de cruce','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total'];
     const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
