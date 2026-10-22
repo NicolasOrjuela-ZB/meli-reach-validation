@@ -17,6 +17,25 @@ Dashboard y pipeline para comparar impresiones, reach total e IIEE de **Campaign
 | Pinterest semanal | Archivo "Day to Day Cumulative & Weekly Trend" del cliente y cargar con `load_cm.py` | Cuando lo entregue el cliente |
 | Base cliente (chosen frequency) y Adverity | Ya están en BigQuery | Automático |
 | Maestro de network codes | Exportar las hojas "NETWORK CODES + LISTA MEDIOS" y "NETWORK CODES" del doc *Medios Matt - Ajustes TAXONOMIA* y cargar `bronze_taxonomy_network_codes` (reemplazo completo) | Cuando cambie la taxonomía |
+| Facturas de CM | Exportar la hoja "Facturas" a CSV y correr `python scripts/load_invoices.py facturas.csv` (reemplaza `bronze_cm_invoices` completa) | Cuando lleguen facturas nuevas |
+
+### Facturas de CM
+
+La hoja "Facturas" se exporta a CSV con las columnas **Factura, BU, Pais, Periodo, Fecha, Impresiones, Costo USD, CPM**.
+El script convierte el país (CL/UY/CO/MX/PE/AR → MLC/MLU/MCO/MLM/MPE/MLA), interpreta el periodo como mes
+(acepta `2026-03`, `mar-2026`, `03/2026`, `marzo 2026`…) y, si falta el CPM, lo calcula como costo ÷ impresiones × 1.000.
+Antes de reemplazar valida país, BU, periodo e importes: si alguna fila no se puede interpretar, no toca la tabla y
+muestra las filas problemáticas. Con `--dry-run` solo imprime el resumen.
+
+```bash
+python scripts/load_invoices.py facturas.csv --dry-run   # revisar
+python scripts/load_invoices.py facturas.csv             # reemplazar
+python scripts/build_dashboard.py                        # regenerar el dashboard
+```
+
+Hoy hay facturas de **CL y UY (2025–2026) y CO (2026)**. Los meses sin factura aparecen como "sin factura" en el
+dashboard. El monto reclamable sale de `gold_cm_billing_monthly`: impresiones en exceso (CM cruzado − plataforma
+cruzada) × CPM facturado ÷ 1.000, por país, BU y mes.
 
 ```bash
 # cargar uno o varios archivos (detecta el tipo solo)

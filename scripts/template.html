@@ -92,6 +92,22 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
 .shlbl{font-size:12px;color:var(--ink-2);font-weight:600}
 .shbar{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .shbar i{display:block;height:10px;border-radius:3px;min-width:2px}
+.kgrp{border-radius:12px;padding:10px 12px 12px;margin-top:12px}
+.kgrp.cm{background:rgba(42,120,214,.07)}
+.kgrp.pl{background:rgba(235,104,52,.07)}
+.kgrp.bill{background:rgba(46,158,91,.07)}
+.kglbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:var(--ink-2);margin-bottom:8px}
+.kgrp .kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.kgrp .card{box-shadow:none}
+th.hcm,td.tcm{background:rgba(42,120,214,.07)}
+th.hpl,td.tpl{background:rgba(235,104,52,.07)}
+th.hcmp,td.tcmp{background:rgba(0,0,0,.035)}
+th.hbill,td.tbill{background:rgba(46,158,91,.07)}
+th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2)}
+.defs{background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12.5px;line-height:1.5;columns:2;column-gap:28px}
+.defs div{break-inside:avoid;margin-bottom:7px}
+.defs b{color:var(--ink)}
+@media (max-width:900px){.defs{columns:1}}
 @media (max-width:1180px){.two,.three{grid-template-columns:1fr}}
 @media (max-width:700px){.app{grid-template-columns:1fr}.rail{display:none}main{padding:14px 16px 40px}.kpis{grid-template-columns:1fr}}
 </style>
@@ -177,10 +193,12 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
       <button class="btn primary" id="iDl">Descargar detalle (CSV)</button>
     </section>
 
-    <section class="grid kpis" id="iKpis"></section>
+    <div style="margin-top:4px"><button class="btn" id="iDefsBtn" aria-expanded="false">¿Qué significa cada métrica?</button><div class="defs" id="iDefs" style="display:none"></div></div>
+
+    <div id="iKpis"></div>
 
     <section class="card" style="margin-top:14px">
-      <div class="cardhead"><div><h3>Impresiones por mes · CM vs plataforma</h3><div class="hint">Barras: impresiones cruzadas según el tipo de cruce elegido. La tabla agrega los totales y la cobertura de cada lado.</div></div></div>
+      <div class="cardhead"><div><h3>Impresiones por mes · CM vs plataforma</h3><div class="hint">Barras: impresiones cruzadas según el tipo de cruce elegido. La tabla agrega los totales, la cobertura de cada lado y la factura de CM del mes.</div></div></div>
       <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360 cruzado</span><span><span class="sw" style="background:var(--s-pl)"></span>Plataforma cruzada</span></div>
       <div id="iChart"></div>
       <div class="tablewrap" style="max-height:44vh;margin-top:10px"><table id="iMonthly"><thead></thead><tbody></tbody></table></div>
@@ -191,6 +209,11 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
         <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360</span><span><span class="sw" style="background:var(--s-pl)"></span>Plataforma</span></div>
         <div id="iShare"></div></div>
       <div class="card"><div class="cardhead"><div><h3>País × tipo de cruce</h3><div class="hint">Todas las líneas del filtro, abiertas por tipo de cruce. En cada celda: impresiones CM · plataforma y su VAR.</div></div></div><div class="tablewrap" style="max-height:52vh"><table id="iMxCountry"></table></div></div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <div class="cardhead"><div><h3>Facturación por país</h3><div class="hint">Reclamo estimado por mercado. Las columnas de factura son del total país × BU × mes, no se abren por plataforma.</div></div></div>
+      <div class="tablewrap" style="max-height:52vh"><table id="iBillCountry"></table></div>
     </section>
 
     <section class="card" style="margin-top:14px">
@@ -440,8 +463,30 @@ const pgSort2=(a,b)=>(PG_ORDER.indexOf(a)+1||99)-(PG_ORDER.indexOf(b)+1||99)||a.
 function impDecode(){const D=IMPD.dims;IM={months:IMPD.months,
   lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],
     ser:a[10]?a[10].split(',').map(s=>{const p=s.split(':');return [+p[0],parseInt(p[1],36)]}):[]}))};
-  IM.years=[...new Set(IM.months.map(m=>m.slice(0,4)))].sort()}
+  IM.years=[...new Set(IM.months.map(m=>m.slice(0,4)))].sort();
+  const mi=Object.fromEntries(IM.months.map((m,i)=>[m,i]));
+  (IMPD.inv||[]).forEach(r=>{const i=mi[r[2]];if(i!==undefined)INV[r[0]+'|'+r[1]+'|'+i]=r})}
 const mOk=i=>(!F3.year.size||F3.year.has(IM.months[i].slice(0,4)))&&(!F3.month.size||F3.month.has(IM.months[i]));
+const usd=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+fmtN(Math.round(Math.abs(v)));
+const INV={},INVCOV='Facturas cargadas: CL, UY (2025–2026), CO (2026).';
+const NOSPLIT='Total de la factura, no se abre por plataforma.';
+const DEFS=[
+ ['CM total','Todas las impresiones que registró CM360 en el filtro (diario de CM). Incluye líneas sin data de plataforma (Meta, medios directos, Google Ads, Twitter) y líneas sin cruce.'],
+ ['CM cruzado','Impresiones de CM solo de las líneas que también existen en la plataforma, según el tipo de cruce elegido (por defecto, misma tool).'],
+ ['Plataforma total','Impresiones que reporta directamente DV360, TikTok o Pinterest en el filtro.'],
+ ['Plataforma cruzada','Impresiones de plataforma solo de las líneas que también existen en CM.'],
+ ['% cobertura CM','CM cruzado ÷ CM total. Qué parte de lo que mide CM se pudo comparar.'],
+ ['% cobertura plataforma','Plataforma cruzada ÷ plataforma total.'],
+ ['VAR %','Plataforma cruzada ÷ CM cruzado − 1. Negativo = CM cuenta más que la plataforma.'],
+ ['VAR impresiones','Plataforma cruzada − CM cruzado.'],
+ ['Impresiones facturadas','Lo que CM cobró en la factura del mes (país × BU). Coincide con CM total (±0,4%).'],
+ ['Costo facturado','Valor de la factura en USD.'],
+ ['CPM facturado','Costo ÷ impresiones facturadas × 1.000.'],
+ ['Impresiones en exceso','CM cruzado − plataforma cruzada; impresiones que CM contó y la plataforma no.'],
+ ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],
+ ['% de la factura','Monto reclamable ÷ costo facturado.']];
+const DEF=Object.fromEntries(DEFS);
+const tip=k=>` title="${esc(k+': '+(DEF[k]||''))}"`;
 const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
 // Cruzado = la línea cae en los tipos elegidos; sin selección cuentan los tres tipos de cruce
 const inCr=(l,s)=>{const c=s||F3.cruce;return c.size?c.has(l.mt):CROSS.includes(l.mt)};
@@ -454,17 +499,42 @@ function iOpts(){IDIMS.forEach(([id,k,get,all])=>{const vals=[...new Set(IM.line
   const mv=IM.months.filter(m=>!F3.year.size||F3.year.has(m.slice(0,4)));
   msFill($('#iMonth'),mv,F3.month,'Todos',null,iRender);
   msFill($('#iCruce'),MTYPES,F3.cruce,'Todos',null,iRender)}
-function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!(F3.year.size||F3.month.size)||l.ser.some(x=>mOk(x[0]))));iKpis();iMonthly();iShare();iMxCountry();iMxPg();iToolsTbl()}
+function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!(F3.year.size||F3.month.size)||l.ser.some(x=>mOk(x[0]))));billCompute();iKpis();iMonthly();iShare();iMxCountry();iBillCountry();iMxPg();iToolsTbl()}
 const pctN=(a,b)=>b?(a/b*100).toFixed(1)+'%':'—';
-const kpiCard=(t,num,hint)=>`<div class="card kpi"><h3>${t}</h3><div class="row"><div><span class="num">${num}</span></div></div><div class="hint">${hint}</div></div>`;
+const kpiCard=(t,num,hint)=>`<div class="card kpi"${tip(t)}><h3>${t}</h3><div class="row"><div><span class="num">${num}</span></div></div><div class="hint">${hint}</div></div>`;
+// Facturación: la factura es por país × BU × mes, así que el exceso se calcula con ese mismo corte
+// (y respetando los filtros de plataforma/campaña/etc. que achican el exceso, no la factura).
+let BILL=null;
+function billCompute(){
+  const key={},mo={},co={},tot={cmX:0,plX:0,bi:0,bc:0,ex:0,re:0,inv:0,sin:0};
+  cur3.forEach(l=>{const x=inCr(l);for(const [i,v] of l.ser){if(!mOk(i))continue;
+    const k=l.c+'|'+l.b+'|'+i,o=key[k]||(key[k]={c:l.c,mi:i,cmX:0,plX:0});
+    if(x){if(l.side===0)o.cmX+=v;else o.plX+=v}}});
+  const add=(o,s)=>{o.cmX+=s.cmX;o.plX+=s.plX;o.bi+=s.bi;o.bc+=s.bc;o.ex+=s.ex;o.re+=s.re;o.inv+=s.inv;o.sin+=s.sin};
+  const blank=()=>({cmX:0,plX:0,bi:0,bc:0,ex:0,re:0,inv:0,sin:0});
+  Object.entries(key).forEach(([k,o])=>{
+    const iv=INV[k],ex=o.cmX-o.plX;
+    const s={cmX:o.cmX,plX:o.plX,bi:iv?iv[4]:0,bc:iv?iv[5]:0,ex:iv?ex:0,re:iv?ex*iv[6]/1000:0,inv:iv?1:0,sin:iv?0:1};
+    add(mo[o.mi]||(mo[o.mi]=blank()),s);add(co[o.c]||(co[o.c]=blank()),s);add(tot,s)});
+  BILL={mo,co,tot}}
+const cpmOf=o=>o.bi?o.bc/o.bi*1000:null;
+const billCells=(o,cls)=>`<td class="n ${cls}">${o.inv?fmtN(o.bi):'<span style="color:var(--ink-3)">sin factura</span>'}</td><td class="n ${cls}">${o.inv?usd(o.bc):'—'}</td><td class="n ${cls}">${o.inv?'$'+(cpmOf(o)||0).toFixed(3):'—'}</td><td class="n ${cls}">${o.inv?fmtN(o.ex):'—'}</td><td class="n ${cls}">${o.inv?usd(o.re):'—'}</td>`;
 function iKpis(){let cmT=0,plT=0,cmX=0,plX=0;
   cur3.forEach(l=>{const s=lSum(l);if(!s)return;if(l.side===0){cmT+=s;if(inCr(l))cmX+=s}else{plT+=s;if(inCr(l))plX+=s}});
-  const v=cmX?plX/cmX-1:null;
-  $('#iKpis').innerHTML=kpiCard('Impresiones CM',fmt(cmT),'Todas las líneas de CM en el filtro')+
-   kpiCard('Impresiones plataforma',fmt(plT),'Data directa DV360 · TikTok · Pinterest')+
-   kpiCard('CM cruzado',fmt(cmX),`${pctN(cmX,cmT)} del total CM · ${crLbl()}`)+
-   kpiCard('Plataforma cruzada',fmt(plX),`${pctN(plX,plT)} del total plataforma`)+
-   `<div class="card kpi"><h3>VAR cruzado</h3><div class="row"><div><span class="lab">plataforma ÷ CM − 1</span><span class="var ${v>0?'pos':v<0?'neg':''}">${pct(v)}</span></div></div><div class="hint">Sobre impresiones cruzadas (${crLbl()})</div></div>`}
+  const v=cmX?plX/cmX-1:null,b=BILL.tot,cpm=cpmOf(b);
+  const varCard=`<div class="card kpi"${tip('VAR %')}><h3>VAR cruzado</h3><div class="row"><div><span class="lab">plataforma ÷ CM − 1</span><span class="var ${v>0?'pos':v<0?'neg':''}">${pct(v)}</span></div><div><span class="lab">en impresiones</span><span class="num" style="font-size:16px">${fmt(plX-cmX)}</span></div></div><div class="hint">Sobre impresiones cruzadas (${crLbl()})</div></div>`;
+  const note=b.inv?(b.sin?`${b.inv} meses con factura · ${b.sin} sin factura`:`${b.inv} facturas en el filtro`):'Sin facturas en el filtro';
+  const grp=(cls,lbl,cards)=>`<div class="kgrp ${cls}"><div class="kglbl">${lbl}</div><div class="grid kpis">${cards}</div></div>`;
+  $('#iKpis').innerHTML=
+   grp('cm','CM360',kpiCard('CM total',fmt(cmT),'Todas las líneas de CM en el filtro')+kpiCard('CM cruzado',fmt(cmX),`${pctN(cmX,cmT)} del total CM · ${crLbl()}`))+
+   grp('pl','Plataforma',kpiCard('Plataforma total',fmt(plT),'Data directa DV360 · TikTok · Pinterest')+kpiCard('Plataforma cruzada',fmt(plX),`${pctN(plX,plT)} del total plataforma`)+varCard)+
+   grp('bill','Facturación CM',
+     kpiCard('Impresiones facturadas',b.inv?fmt(b.bi):'—',b.inv?NOSPLIT:INVCOV)+
+     kpiCard('Costo facturado',b.inv?usd(b.bc):'—',note)+
+     kpiCard('CPM facturado',cpm?'$'+cpm.toFixed(3):'—','Costo ÷ impresiones facturadas × 1.000')+
+     kpiCard('Impresiones en exceso',b.inv?fmt(b.ex):'—','CM cruzado − plataforma cruzada, solo meses con factura')+
+     kpiCard('Monto reclamable',b.inv?usd(b.re):'—','Exceso × CPM ÷ 1.000, por país, BU y mes')+
+     kpiCard('% de la factura',b.inv&&b.bc?pctN(b.re,b.bc):'—','Monto reclamable ÷ costo facturado'))}
 function iMonthlyData(){const M=IM.months.map((m,i)=>({m,i,cmT:0,cmX:0,plT:0,plX:0}));
   cur3.forEach(l=>{const x=inCr(l);for(const [i,v] of l.ser){if(!mOk(i))continue;const o=M[i];if(l.side===0){o.cmT+=v;if(x)o.cmX+=v}else{o.plT+=v;if(x)o.plX+=v}}});
   return M.filter(o=>o.cmT||o.plT)}
@@ -480,10 +550,21 @@ function iMonthly(){const rows=iMonthlyData();const box=$('#iChart');
     if(ix%st===0)s+=`<text x="${x0}" y="${H-8}" text-anchor="middle" style="font-size:10.5px;fill:var(--ink-3)">${o.m}</text>`});
   s+='</svg>';box.innerHTML=s;
   box.querySelectorAll('rect').forEach(r=>{r.onmousemove=e=>{const o=rows[+r.dataset.i];showTT(e,`<b>${o.m}</b><br>CM cruzado: ${fmtN(o.cmX)} (total ${fmtN(o.cmT)})<br>Plataforma cruzada: ${fmtN(o.plX)} (total ${fmtN(o.plT)})<br>VAR: ${pct(o.cmX?o.plX/o.cmX-1:null)}`)};r.onmouseleave=hideTT});
-  $('#iMonthly thead').innerHTML='<tr><th>Mes</th><th class="n">CM total</th><th class="n">CM cruzado</th><th class="n">% cob. CM</th><th class="n">Plat. total</th><th class="n">Plat. cruzada</th><th class="n">% cob. plat.</th><th class="n">VAR</th></tr>';
+  const TH=(t,c,lbl)=>`<th class="n ${c}"${tip(t)}>${lbl||t}</th>`;
+  $('#iMonthly thead').innerHTML='<tr><th></th><th class="grp hcm" colspan="3">CM360</th><th class="grp hpl" colspan="3">Plataforma</th><th class="grp hcmp" colspan="2">Comparación</th><th class="grp hbill" colspan="5">Facturación CM</th></tr>'+
+   '<tr><th>Mes</th>'+TH('CM total','hcm')+TH('CM cruzado','hcm')+TH('% cobertura CM','hcm','% cob. CM')+TH('Plataforma total','hpl','Plat. total')+TH('Plataforma cruzada','hpl','Plat. cruzada')+TH('% cobertura plataforma','hpl','% cob. plat.')+
+   TH('VAR %','hcmp','VAR %')+TH('VAR impresiones','hcmp','VAR impr.')+TH('Impresiones facturadas','hbill','Impr. facturadas')+TH('Costo facturado','hbill','Costo USD')+TH('CPM facturado','hbill','CPM')+TH('Impresiones en exceso','hbill','Exceso')+TH('Monto reclamable','hbill','Reclamable USD')+'</tr>';
   const tot={cmT:0,cmX:0,plT:0,plX:0};rows.forEach(o=>{tot.cmT+=o.cmT;tot.cmX+=o.cmX;tot.plT+=o.plT;tot.plX+=o.plX});
-  const row=o=>`<tr><td>${o.m}</td><td class="n">${fmtN(o.cmT)}</td><td class="n">${fmtN(o.cmX)}</td><td class="n">${pctN(o.cmX,o.cmT)}</td><td class="n">${fmtN(o.plT)}</td><td class="n">${fmtN(o.plX)}</td><td class="n">${pctN(o.plX,o.plT)}</td><td class="n">${pct(o.cmX?o.plX/o.cmX-1:null)}</td></tr>`;
-  $('#iMonthly tbody').innerHTML=rows.map(row).join('')+`<tr style="font-weight:700"><td>Total</td><td class="n">${fmtN(tot.cmT)}</td><td class="n">${fmtN(tot.cmX)}</td><td class="n">${pctN(tot.cmX,tot.cmT)}</td><td class="n">${fmtN(tot.plT)}</td><td class="n">${fmtN(tot.plX)}</td><td class="n">${pctN(tot.plX,tot.plT)}</td><td class="n">${pct(tot.cmX?tot.plX/tot.cmX-1:null)}</td></tr>`}
+  const cells=o=>`<td class="n tcm">${fmtN(o.cmT)}</td><td class="n tcm">${fmtN(o.cmX)}</td><td class="n tcm">${pctN(o.cmX,o.cmT)}</td><td class="n tpl">${fmtN(o.plT)}</td><td class="n tpl">${fmtN(o.plX)}</td><td class="n tpl">${pctN(o.plX,o.plT)}</td><td class="n tcmp">${pct(o.cmX?o.plX/o.cmX-1:null)}</td><td class="n tcmp">${fmtN(o.plX-o.cmX)}</td>`;
+  const z={cmX:0,plX:0,bi:0,bc:0,ex:0,re:0,inv:0,sin:0};
+  $('#iMonthly tbody').innerHTML=rows.map(o=>`<tr><td>${o.m}</td>${cells(o)}${billCells(BILL.mo[o.i]||z,'tbill')}</tr>`).join('')+
+   `<tr style="font-weight:700"><td>Total</td>${cells(tot)}${billCells(BILL.tot,'tbill')}</tr>`}
+function iBillCountry(){
+  const cs=Object.keys(BILL.co).sort(),TH=(t,lbl)=>`<th class="n"${tip(t)}>${lbl||t}</th>`;
+  const row=(name,o)=>`<tr><td>${name}</td><td class="n tcm">${fmtN(o.cmX)}</td><td class="n tpl">${fmtN(o.plX)}</td><td class="n tcmp">${fmtN(o.plX-o.cmX)}</td>${billCells(o,'tbill')}<td class="n tbill">${o.inv&&o.bc?pctN(o.re,o.bc):'—'}</td></tr>`;
+  $('#iBillCountry').innerHTML='<thead><tr><th></th><th class="grp hcm">CM360</th><th class="grp hpl">Plataforma</th><th class="grp hcmp">Comparación</th><th class="grp hbill" colspan="6">Facturación CM</th></tr>'+
+   '<tr><th>País</th>'+TH('CM cruzado')+TH('Plataforma cruzada','Plat. cruzada')+TH('VAR impresiones','VAR impr.')+TH('Impresiones facturadas','Impr. facturadas')+TH('Costo facturado','Costo USD')+TH('CPM facturado','CPM')+TH('Impresiones en exceso','Exceso')+TH('Monto reclamable','Reclamable USD')+TH('% de la factura','% factura')+'</tr></thead><tbody>'+
+   (cs.map(c=>row(c,BILL.co[c])).join('')+(cs.length>1?row('<b>Total</b>',BILL.tot):'')||'<tr><td class="empty">Sin datos</td></tr>')+'</tbody>'}
 const cellHTML=(cm,pl)=>{const v=cm&&pl?pl/cm-1:null;return `<div class="mcell">${fmt(cm)} · ${fmt(pl)}<br><span class="var ${v>0?'pos':v<0?'neg':''}">${pct(v)}</span></div>`};
 // Las matrices muestran TODO lo que pasa el filtro; si hay tipos de cruce marcados, solo esos
 const crSel=l=>!F3.cruce.size||F3.cruce.has(l.mt);
@@ -521,13 +602,21 @@ function iToolsTbl(){const g={};
   $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin líneas para el filtro</td></tr>';
   $('#iToolsInfo').textContent=`${Object.keys(g).length} tools/líneas · mostrando ${rows.length}, ordenados por impresiones`}
 if(IMPD){
+  $('#iDefs').innerHTML=DEFS.map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(v)}</div>`).join('')+`<div style="color:var(--ink-3)">${INVCOV} Los meses sin factura muestran “sin factura”. ${NOSPLIT}</div>`;
+  $('#iDefsBtn').onclick=()=>{const d=$('#iDefs'),on=d.style.display==='none';d.style.display=on?'':'none';$('#iDefsBtn').setAttribute('aria-expanded',on)};
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
   $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
-    const head=['Lado','País','Marca','Plataforma','Tipo de cruce','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total'];
+    const head=['Lado','País','Marca','Plataforma','Tipo de cruce','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
+      'VAR impresiones','CPM facturado USD','Impresiones en exceso','Monto reclamable USD'];
     const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
     const lines=[head.join(',')].concat(cur3.map(l=>{const by={};for(const [i,v] of l.ser)by[i]=v;
-      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l)].join(',')}));
+      // Aporte de la línea al exceso y al reclamo: +CM / −plataforma, solo si cruza y el mes tiene factura
+      let ex=0,re=0;const x=inCr(l);
+      if(x)for(const [i,v] of l.ser){if(!mOk(i))continue;const iv=INV[l.c+'|'+l.b+'|'+i];if(!iv)continue;
+        const d=l.side===0?v:-v;ex+=d;re+=d*iv[6]/1000}
+      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
+        x?-ex:'',ex?(re/ex*1000).toFixed(3):'',x?ex:'',x?re.toFixed(2):''].join(',')}));
     const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Impresiones_mensuales_${DATA.cutoff}.csv`;a.click();URL.revokeObjectURL(a.href)}}
 const tabs=$('#viewTabs');
 tabs.onclick=e=>{const v=e.target.dataset.v;if(!v)return;[...tabs.children].forEach(b=>b.classList.toggle('on',b===e.target));

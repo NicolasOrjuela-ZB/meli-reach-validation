@@ -60,6 +60,14 @@ GROUP BY 1,2,3,4,5,6,7,8,9,10
 """
 
 
+# Facturas de CM (país × BU × mes). Pocas filas: se embeben tal cual.
+Q_INV = f"""
+SELECT country, brand, FORMAT_DATE('%Y-%m', month) AS m, invoice_id,
+  CAST(impressions_billed AS INT64) AS impressions_billed, cost_usd, cpm_usd
+FROM `{DS}.bronze_cm_invoices` ORDER BY country, brand, month
+"""
+
+
 def b36(n):
     s, d = "", "0123456789abcdefghijklmnopqrstuvwxyz"
     while True:
@@ -101,6 +109,8 @@ def main():
     nc = {r["network_code"]: [r["network_code_std"], r["plataforma_compra"], r["partner"], r["formato"], r["implementation"]]
           for r in client.query(Q_NC).result()}
     imp = encode_imp([dict(r) for r in client.query(Q_IMP).result()])
+    imp["inv"] = [[r["country"], r["brand"], r["m"], r["invoice_id"], r["impressions_billed"],
+                   round(r["cost_usd"], 2), round(r["cpm_usd"], 6)] for r in client.query(Q_INV).result()]
     if not lines or not weekly:
         sys.exit("Sin datos: no se regenera el dashboard")
 
@@ -120,6 +130,7 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w", encoding="utf-8").write(html)
     print(f"OK docs/index.html · {len(L)} líneas · {len(W)} filas semanales · {len(imp['lines'])} líneas de impresiones "
+          f"· {len(imp['inv'])} facturas "
           f"({len(json.dumps(imp, separators=(',', ':')))//1024} KB) · corte {cutoff} · {len(html)//1024} KB")
 
 
