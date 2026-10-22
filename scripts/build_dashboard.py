@@ -47,6 +47,47 @@ SELECT network_code, network_code_std, IFNULL(plataforma_compra,'') plataforma_c
 FROM `{DS}.silver_taxonomy_network_codes`
 """
 
+# Pestaña Impresiones: una fila por lado × línea (los atributos son de línea; solo mes/impresiones varían)
+Q_IMP = f"""
+SELECT side, country, brand, platform_group, match_type, IFNULL(tool_id,'') tool_id, line_name,
+  IFNULL(network_code,'') network_code, IFNULL(partner,'') partner, IFNULL(campana,'') campana,
+  ARRAY_AGG(STRUCT(FORMAT_DATE('%Y-%m', month) AS m, impressions AS i) ORDER BY month) AS ser
+FROM `{DS}.gold_impressions_monthly`
+GROUP BY 1,2,3,4,5,6,7,8,9,10
+"""
+
+
+def b36(n):
+    s, d = "", "0123456789abcdefghijklmnopqrstuvwxyz"
+    while True:
+        s, n = d[n % 36] + s, n // 36
+        if not n:
+            return s
+
+
+def encode_imp(rows):
+    """Codificación columnar con diccionarios: meses y dimensiones indexados, serie mensual "idx:valor36,…" (base 36)."""
+    months = sorted({s["m"] for r in rows for s in r["ser"]})
+    midx = {m: i for i, m in enumerate(months)}
+    dims = {k: [] for k in ("country", "brand", "pg", "mt", "nc", "partner", "camp", "name")}
+    didx = {k: {} for k in dims}
+
+    def dx(k, v):
+        v = v or ""
+        if v not in didx[k]:
+            didx[k][v] = len(dims[k])
+            dims[k].append(v)
+        return didx[k][v]
+
+    lines = []
+    for r in rows:
+        ser = ",".join(f"{midx[s['m']]}:{b36(int(s['i']))}" for s in r["ser"])
+        lines.append([0 if r["side"] == "CM" else 1, dx("country", r["country"]), dx("brand", r["brand"]),
+                      dx("pg", r["platform_group"]), dx("mt", r["match_type"]), r["tool_id"],
+                      dx("name", r["line_name"]), dx("nc", r["network_code"]), dx("partner", r["partner"]),
+                      dx("camp", r["campana"]), ser])
+    return {"months": months, "dims": dims, "lines": lines}
+
 
 def main():
     client = bigquery.Client(project=PROJECT)
@@ -56,6 +97,7 @@ def main():
     cutoff = next(iter(client.query(Q_CUTOFF).result()))["cutoff"]
     nc = {r["network_code"]: [r["network_code_std"], r["plataforma_compra"], r["partner"], r["formato"], r["implementation"]]
           for r in client.query(Q_NC).result()}
+    imp = encode_imp([dict(r) for r in client.query(Q_IMP).result()])
     if not lines or not weekly:
         sys.exit("Sin datos: no se regenera el dashboard")
 
@@ -67,14 +109,15 @@ def main():
     L = [[cell(r.get(k)) for k in KEYS] for r in lines]
     W = [[w["country"], w["platform"], cell(w["week_start"]), w["impr_cm_m"], w["impr_pl"], w["reach_cm_m"], w["reach_pl"],
           w["iiee_cm_m"], w["iiee_pl"], w["lines"], w["lines_m"]] for w in weekly]
-    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "nc": nc, "cutoff": cell(cutoff),
+    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "nc": nc, "imp": imp, "cutoff": cell(cutoff),
                        "generated": datetime.date.today().isoformat()}, separators=(",", ":"), ensure_ascii=False)
     html = open(TEMPLATE, encoding="utf-8").read()
     assert "/*__DATA__*/" in html, "template.html sin marcador /*__DATA__*/"
     html = html.replace("/*__DATA__*/", data)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w", encoding="utf-8").write(html)
-    print(f"OK docs/index.html · {len(L)} líneas · {len(W)} filas semanales · corte {cutoff} · {len(html)//1024} KB")
+    print(f"OK docs/index.html · {len(L)} líneas · {len(W)} filas semanales · {len(imp['lines'])} líneas de impresiones "
+          f"({len(json.dumps(imp, separators=(',', ':')))//1024} KB) · corte {cutoff} · {len(html)//1024} KB")
 
 
 if __name__ == "__main__":

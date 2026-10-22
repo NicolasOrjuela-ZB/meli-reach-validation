@@ -26,6 +26,10 @@ jobs:
           echo '${{ secrets.GCP_CREDENTIALS }}' > "$RUNNER_TEMP/gcp.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp.json" >> "$GITHUB_ENV"
 
+      - name: Refrescar bronze_platform_daily_2026 (si falla, el build sigue con la copia actual)
+        continue-on-error: true
+        run: python scripts/refresh_platform_daily.py
+
       - name: Generar docs/index.html
         run: python scripts/build_dashboard.py
 
