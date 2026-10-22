@@ -190,11 +190,11 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
       <div class="card"><div class="cardhead"><div><h3>Distribución por tipo de cruce</h3><div class="hint">Qué parte de las impresiones de cada lado cae en cada tipo de cruce, con los filtros aplicados.</div></div></div>
         <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360</span><span><span class="sw" style="background:var(--s-pl)"></span>Plataforma</span></div>
         <div id="iShare"></div></div>
-      <div class="card"><div class="cardhead"><div><h3>País × tipo de cruce</h3><div class="hint">En cada celda: impresiones CM · plataforma y su VAR.</div></div></div><div class="tablewrap" style="max-height:52vh"><table id="iMxCountry"></table></div></div>
+      <div class="card"><div class="cardhead"><div><h3>País × tipo de cruce</h3><div class="hint">Todas las líneas del filtro, abiertas por tipo de cruce. En cada celda: impresiones CM · plataforma y su VAR.</div></div></div><div class="tablewrap" style="max-height:52vh"><table id="iMxCountry"></table></div></div>
     </section>
 
     <section class="card" style="margin-top:14px">
-      <div class="cardhead"><div><h3>Plataforma × mes</h3><div class="hint">Impresiones cruzadas con el tipo de cruce elegido: CM · plataforma y VAR.</div></div></div>
+      <div class="cardhead"><div><h3>Plataforma × mes</h3><div class="hint">Todas las líneas del filtro (si eliges tipos de cruce, solo esos): CM · plataforma y VAR por mes.</div></div></div>
       <div class="tablewrap" style="max-height:52vh"><table id="iMxPg"></table></div>
     </section>
 
@@ -484,13 +484,19 @@ function iMonthly(){const rows=iMonthlyData();const box=$('#iChart');
   const tot={cmT:0,cmX:0,plT:0,plX:0};rows.forEach(o=>{tot.cmT+=o.cmT;tot.cmX+=o.cmX;tot.plT+=o.plT;tot.plX+=o.plX});
   const row=o=>`<tr><td>${o.m}</td><td class="n">${fmtN(o.cmT)}</td><td class="n">${fmtN(o.cmX)}</td><td class="n">${pctN(o.cmX,o.cmT)}</td><td class="n">${fmtN(o.plT)}</td><td class="n">${fmtN(o.plX)}</td><td class="n">${pctN(o.plX,o.plT)}</td><td class="n">${pct(o.cmX?o.plX/o.cmX-1:null)}</td></tr>`;
   $('#iMonthly tbody').innerHTML=rows.map(row).join('')+`<tr style="font-weight:700"><td>Total</td><td class="n">${fmtN(tot.cmT)}</td><td class="n">${fmtN(tot.cmX)}</td><td class="n">${pctN(tot.cmX,tot.cmT)}</td><td class="n">${fmtN(tot.plT)}</td><td class="n">${fmtN(tot.plX)}</td><td class="n">${pctN(tot.plX,tot.plT)}</td><td class="n">${pct(tot.cmX?tot.plX/tot.cmX-1:null)}</td></tr>`}
-const cellHTML=(cm,pl)=>{const v=cm?pl/cm-1:null;return `<div class="mcell">${fmt(cm)} · ${fmt(pl)}<br><span class="var ${v>0?'pos':v<0?'neg':''}">${pct(v)}</span></div>`};
-function iMxCountry(){const types=[['Tool + taxo',new Set(['Misma tool y taxo'])],['Tool, distinta taxo',new Set(['Misma tool, distinta taxo'])],['Taxo sin tool',new Set(['Misma taxo, sin tool'])],['Todos los cruces',new Set(CROSS)]];
-  const agg={};cur3.forEach(l=>{const s=lSum(l);if(!s)return;const a=agg[l.c]=agg[l.c]||{};types.forEach(([lbl,cr])=>{if(!inCr(l,cr))return;const o=a[lbl]=a[lbl]||{cm:0,pl:0};o[l.side===0?'cm':'pl']+=s})});
-  const cs=Object.keys(agg).sort();
-  $('#iMxCountry').innerHTML='<thead><tr><th>País</th>'+types.map(t=>`<th class="n">${t[0]}</th>`).join('')+'</tr></thead><tbody>'+
-   (cs.map(c=>`<tr><td>${c}</td>`+types.map(([lbl])=>{const o=agg[c][lbl];return `<td class="n">${o?cellHTML(o.cm,o.pl):'—'}</td>`}).join('')+'</tr>').join('')||'<tr><td colspan="5" class="empty">Sin datos</td></tr>')+'</tbody>'}
-function iMxPg(){const agg={};cur3.forEach(l=>{if(!inCr(l))return;for(const [i,v] of l.ser){if(!mOk(i))continue;const a=agg[l.g]=agg[l.g]||{};const o=a[i]=a[i]||{cm:0,pl:0};o[l.side===0?'cm':'pl']+=v}});
+const cellHTML=(cm,pl)=>{const v=cm&&pl?pl/cm-1:null;return `<div class="mcell">${fmt(cm)} · ${fmt(pl)}<br><span class="var ${v>0?'pos':v<0?'neg':''}">${pct(v)}</span></div>`};
+// Las matrices muestran TODO lo que pasa el filtro; si hay tipos de cruce marcados, solo esos
+const crSel=l=>!F3.cruce.size||F3.cruce.has(l.mt);
+const MTSHORT={'Misma tool y taxo':'Tool + taxo','Misma tool, distinta taxo':'Tool, distinta taxo','Misma taxo, sin tool':'Taxo sin tool','Solo CM':'Solo CM','Solo plataforma':'Solo plat.','Sin fuente de plataforma':'Sin fuente plat.'};
+function iMxCountry(){
+  const agg={},tot={},present=new Set();
+  cur3.forEach(l=>{if(!crSel(l))return;const s=lSum(l);if(!s)return;present.add(l.mt);
+    const a=agg[l.c]=agg[l.c]||{};const o=a[l.mt]=a[l.mt]||{cm:0,pl:0};o[l.side===0?'cm':'pl']+=s;
+    const t=tot[l.c]=tot[l.c]||{cm:0,pl:0};t[l.side===0?'cm':'pl']+=s});
+  const types=MTYPES.filter(t=>present.has(t)),cs=Object.keys(agg).sort();
+  $('#iMxCountry').innerHTML='<thead><tr><th>País</th>'+types.map(t=>`<th class="n">${MTSHORT[t]||t}</th>`).join('')+(cs.length?'<th class="n">Total filtro</th>':'')+'</tr></thead><tbody>'+
+   (cs.map(c=>`<tr><td>${c}</td>`+types.map(t=>{const o=agg[c][t];return `<td class="n">${o?cellHTML(o.cm,o.pl):'—'}</td>`}).join('')+`<td class="n">${cellHTML(tot[c].cm,tot[c].pl)}</td></tr>`).join('')||'<tr><td class="empty">Sin datos</td></tr>')+'</tbody>'}
+function iMxPg(){const agg={};cur3.forEach(l=>{if(!crSel(l))return;for(const [i,v] of l.ser){if(!mOk(i))continue;const a=agg[l.g]=agg[l.g]||{};const o=a[i]=a[i]||{cm:0,pl:0};o[l.side===0?'cm':'pl']+=v}});
   const gs=Object.keys(agg).sort(pgSort2);const mi=[...new Set([].concat(...gs.map(g=>Object.keys(agg[g]).map(Number))))].sort((a,b)=>a-b);
   $('#iMxPg').innerHTML='<thead><tr><th>Plataforma</th>'+mi.map(i=>`<th class="n">${IM.months[i]}</th>`).join('')+'</tr></thead><tbody>'+
    (gs.map(g=>`<tr><td style="white-space:nowrap">${g}</td>`+mi.map(i=>{const o=agg[g][i];return `<td class="n">${o?cellHTML(o.cm,o.pl):'—'}</td>`}).join('')+'</tr>').join('')||'<tr><td class="empty">Sin datos</td></tr>')+'</tbody>'}
