@@ -49,7 +49,10 @@ FROM `{DS}.silver_taxonomy_network_codes`
 
 # Pestaña Impresiones: una fila por lado × línea (los atributos son de línea; solo mes/impresiones varían)
 Q_IMP = f"""
-SELECT side, country, brand, platform_group, match_type, IFNULL(tool_id,'') tool_id, line_name,
+SELECT side, country, brand,
+  -- DV360 · Otros son deals/medios vía DV sin network code claro: se consolidan en Deals
+  REPLACE(platform_group, 'DV360 · Otros', 'DV360 · Deals') AS platform_group,
+  match_type, IFNULL(tool_id,'') tool_id, line_name,
   IFNULL(network_code,'') network_code, IFNULL(partner,'') partner, IFNULL(campana,'') campana,
   ARRAY_AGG(STRUCT(FORMAT_DATE('%Y-%m', month) AS m, impressions AS i) ORDER BY month) AS ser
 FROM `{DS}.gold_impressions_monthly`
