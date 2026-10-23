@@ -21,21 +21,26 @@ Dashboard y pipeline para comparar impresiones, reach total e IIEE de **Campaign
 
 ### Facturas de CM
 
-La hoja "Facturas" se exporta a CSV con las columnas **Factura, BU, Pais, Periodo, Fecha, Impresiones, Costo USD, CPM**.
-El script convierte el país (CL/UY/CO/MX/PE/AR → MLC/MLU/MCO/MLM/MPE/MLA), interpreta el periodo como mes
-(acepta `2026-03`, `mar-2026`, `03/2026`, `marzo 2026`…) y, si falta el CPM, lo calcula como costo ÷ impresiones × 1.000.
-Antes de reemplazar valida país, BU, periodo e importes: si alguna fila no se puede interpretar, no toca la tabla y
-muestra las filas problemáticas. Con `--dry-run` solo imprime el resumen.
+La hoja "Facturas" se exporta a CSV con las columnas **Factura, BU, Pais, Periodo, Fecha, Impresiones, Costo, CPM**
+(opcional **Moneda**), una fila por línea de factura. El script:
+
+- convierte el país (CL/UY/CO/MX/PE/AR → MLC/MLU/MCO/MLM/MPE/MLA) e interpreta el periodo como mes
+  (acepta `2026-03`, `mar-2026`, `03/2026`, `marzo 2026`…);
+- **suma las líneas de cada factura** y deja una fila por país × BU × mes (México trae decenas de líneas por factura);
+- **convierte MXN a USD** con la tasa de `--fx` (default 18,26) y guarda `currency`, `cost_original` y `fx_rate`;
+- recalcula el CPM sobre el total y **avisa si alguna línea se aparta** más de `--cpm-tol` (default 50%) del CPM de su factura;
+- valida país, BU, periodo e importes: si alguna fila no se puede interpretar, no toca la tabla y muestra cuáles.
 
 ```bash
-python scripts/load_invoices.py facturas.csv --dry-run   # revisar
+python scripts/load_invoices.py facturas.csv --dry-run   # revisar (resumen + avisos de CPM)
+python scripts/load_invoices.py facturas.csv --fx 19.1   # otra tasa MXN → USD
 python scripts/load_invoices.py facturas.csv             # reemplazar
 python scripts/build_dashboard.py                        # regenerar el dashboard
 ```
 
-Hoy hay facturas de **CL y UY (2025–2026) y CO (2026)**. Los meses sin factura aparecen como "sin factura" en el
-dashboard. El monto reclamable sale de `gold_cm_billing_monthly`: impresiones en exceso (CM cruzado − plataforma
-cruzada) × CPM facturado ÷ 1.000, por país, BU y mes.
+Los meses sin factura aparecen como "sin factura" en el dashboard, y la línea de cobertura ("Facturas cargadas: …")
+se arma sola con lo que haya en la tabla. El monto reclamable sale de `gold_cm_billing_monthly`: impresiones en
+exceso (CM cruzado − plataforma cruzada) × CPM facturado ÷ 1.000, por país, BU y mes.
 
 ```bash
 # cargar uno o varios archivos (detecta el tipo solo)

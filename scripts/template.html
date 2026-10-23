@@ -469,7 +469,18 @@ function impDecode(){const D=IMPD.dims;IM={months:IMPD.months,
   (IMPD.inv||[]).forEach(r=>{const i=mi[r[2]];if(i!==undefined)INV[r[0]+'|'+r[1]+'|'+i]=r})}
 const mOk=i=>(!F3.year.size||F3.year.has(IM.months[i].slice(0,4)))&&(!F3.month.size||F3.month.has(IM.months[i]));
 const usd=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+fmtN(Math.round(Math.abs(v)));
-const INV={},INVCOV='Facturas cargadas: CL, UY (2025–2026), CO (2026).';
+const INV={},CC={MLC:'CL',MLU:'UY',MCO:'CO',MLM:'MX',MPE:'PE',MLA:'AR'};
+// Cobertura de facturas: se arma con lo que haya cargado, agrupando países con el mismo rango de años
+function covText(inv){
+  if(!inv||!inv.length)return 'Sin facturas cargadas.';
+  const by={};inv.forEach(r=>{(by[r[0]]=by[r[0]]||new Set()).add(r[2].slice(0,4))});
+  const g={};Object.entries(by).forEach(([c,s])=>{const y=[...s].sort(),a=+y[0],b=+y[y.length-1];
+    const lbl=y.length===1?y[0]:(b-a+1===y.length?`${a}–${b}`:y.join(', '));
+    (g[lbl]=g[lbl]||[]).push(CC[c]||c)});
+  return 'Facturas cargadas: '+Object.entries(g).sort((x,y)=>x[0].localeCompare(y[0]))
+    .map(([y,cs])=>`${cs.sort().join(', ')} (${y})`).join(' · ')+'.';
+}
+const INVCOV=covText(IMPD&&IMPD.inv);
 const NOSPLIT='Total de la factura, no se abre por plataforma.';
 const DEFS=[
  ['CM total','Todas las impresiones que registró CM360 en el filtro (diario de CM). Incluye líneas sin data de plataforma (Meta, medios directos, Google Ads, Twitter) y líneas sin cruce.'],
@@ -481,7 +492,7 @@ const DEFS=[
  ['VAR %','Plataforma cruzada ÷ CM cruzado − 1. Negativo = CM cuenta más que la plataforma.'],
  ['VAR impresiones','Plataforma cruzada − CM cruzado.'],
  ['Impresiones facturadas','Lo que CM cobró en la factura del mes (país × BU). Coincide con CM total (±0,4%).'],
- ['Costo facturado','Valor de la factura en USD.'],
+ ['Costo facturado','Valor de la factura en USD. México se factura en MXN; se convierte a USD con la tasa 18,26.'],
  ['CPM facturado','Costo ÷ impresiones facturadas × 1.000.'],
  ['Impresiones en exceso','CM cruzado − plataforma cruzada; impresiones que CM contó y la plataforma no.'],
  ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],

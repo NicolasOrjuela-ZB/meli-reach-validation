@@ -1,13 +1,17 @@
 """Reemplaza bronze_cm_invoices con el CSV exportado de la hoja "Facturas".
 
-Columnas esperadas (como salen de la hoja): Factura, BU, Pais, Periodo, Fecha, Impresiones, Costo USD, CPM.
+Columnas esperadas (como salen de la hoja): Factura, BU, Pais, Periodo, Fecha, Impresiones, Costo, CPM
+(opcional Moneda). Una fila por línea de factura: México trae varias líneas por factura y se suman.
   - Pais: CL/UY/CO/MX/PE/AR -> MLC/MLU/MCO/MLM/MPE/MLA
   - BU: ML / MP (Mercado Libre / Mercado Pago)
   - Periodo: cualquier formato con mes y año (2026-03, mar-2026, 03/2026, marzo 2026…) -> primer día del mes
-  - CPM: si viene vacío se calcula como costo / impresiones * 1000
+  - Moneda: si no viene, MXN para México y USD para el resto. El costo en MXN se pasa a USD con --fx
+  - El CPM se recalcula sobre el total ya agrupado; avisa si alguna línea se aparta del CPM de su factura
 
-  python scripts/load_invoices.py facturas.csv            # reemplaza la tabla
-  python scripts/load_invoices.py facturas.csv --dry-run  # solo muestra el resumen
+  python scripts/load_invoices.py facturas.csv                 # reemplaza la tabla
+  python scripts/load_invoices.py facturas.csv --dry-run       # solo muestra el resumen
+  python scripts/load_invoices.py facturas.csv --fx 19.1       # otra tasa MXN -> USD (default 18.26)
+  python scripts/load_invoices.py facturas.csv --cpm-tol 0.3   # umbral del aviso de CPM (default 0.5)
 
 Después de cargar hay que regenerar el dashboard (scripts/build_dashboard.py).
 """
@@ -16,12 +20,14 @@ import os
 import re
 import sys
 
+import numpy as np
 import pandas as pd
 from google.cloud import bigquery
 
 PROJECT = "mbw-spl-brazil"
 TABLE = f"{PROJECT}.ds_meli_reach_validation.bronze_cm_invoices"
 COUNTRY = {"CL": "MLC", "UY": "MLU", "CO": "MCO", "MX": "MLM", "PE": "MPE", "AR": "MLA"}
+FX_MXN = 18.26  # MXN por USD; se cambia con --fx
 MONTHS = {m: i + 1 for i, m in enumerate(
     ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"])}
 MONTHS.update({m: i + 1 for i, m in enumerate(
@@ -85,7 +91,7 @@ def num(s):
     return pd.to_numeric(s.map(num1), errors="coerce")
 
 
-def main(path, dry):
+def main(path, dry, fx, tol):
     raw = pd.read_csv(path, dtype=str, keep_default_na=False)
     df = pd.DataFrame({
         "invoice_id": col(raw, "Factura", "Invoice").astype(str).str.strip(),
@@ -93,25 +99,60 @@ def main(path, dry):
         "country": col(raw, "Pais", "País", "Country").astype(str).str.strip().str.upper(),
         "month": col(raw, "Periodo", "Período", "Mes").map(to_month),
         "impressions_billed": num(col(raw, "Impresiones", "Impressions")),
-        "cost_usd": num(col(raw, "Costo USD", "Costo", "Cost USD")),
-        "cpm_usd": num(col(raw, "CPM", "CPM USD")),
+        "cost": num(col(raw, "Costo USD", "Costo", "Cost USD", "Importe")),
+        "cpm": num(col(raw, "CPM", "CPM USD")),
     })
     df["country"] = df.country.map(lambda c: COUNTRY.get(c, c))
-    df["cpm_usd"] = df.cpm_usd.where(df.cpm_usd.notna() & (df.cpm_usd > 0),
-                                     df.cost_usd / df.impressions_billed * 1000)
+    # Moneda: la del archivo si viene, si no MXN para México y USD para el resto
+    try:
+        df["currency"] = col(raw, "Moneda", "Currency").astype(str).str.strip().str.upper()
+    except SystemExit:
+        df["currency"] = np.where(df.country == "MLM", "MXN", "USD")
+    df["currency"] = df.currency.where(df.currency.isin(["USD", "MXN"]),
+                                       np.where(df.country == "MLM", "MXN", "USD"))
+    df["fx_rate"] = np.where(df.currency == "MXN", fx, 1.0)
 
-    bad = df[df.month.isna() | df.impressions_billed.isna() | df.cost_usd.isna()
+    bad = df[df.month.isna() | df.impressions_billed.isna() | df.cost.isna()
              | ~df.country.isin(COUNTRY.values()) | ~df.brand.isin(["ML", "MP"])]
     if len(bad):
         print(f"{len(bad)} filas no se pudieron interpretar (país, BU, periodo o importes):")
         print(bad.head(10).to_string(index=False))
         sys.exit("No se reemplaza la tabla: revisa el archivo.")
-    df["impressions_billed"] = df.impressions_billed.round().astype("int64")
-    df = df[["country", "brand", "month", "invoice_id", "impressions_billed", "cost_usd", "cpm_usd"]]
 
-    print(f"{os.path.basename(path)}: {len(df)} facturas · {df.country.nunique()} países "
-          f"({', '.join(sorted(df.country.unique()))}) · {df.month.min()} → {df.month.max()} · "
-          f"{df.impressions_billed.sum():,} impresiones · ${df.cost_usd.sum():,.0f}")
+    # Líneas con un CPM muy distinto al de su factura (posible error de captura o de unidad)
+    g = df.groupby(["country", "brand", "month"], dropna=False)
+    ref = (g.cost.transform("sum") / g.impressions_billed.transform("sum") * 1000)
+    line_cpm = df.cost / df.impressions_billed.replace(0, np.nan) * 1000
+    odd = df[(g.impressions_billed.transform("size") > 1) & ref.gt(0)
+             & (line_cpm / ref - 1).abs().gt(tol)].assign(cpm_linea=line_cpm, cpm_factura=ref)
+    if len(odd):
+        print(f"Aviso: {len(odd)} líneas con CPM que se aparta más de {tol:.0%} del de su factura:")
+        print(odd[["invoice_id", "country", "brand", "month", "impressions_billed", "cost",
+                   "cpm_linea", "cpm_factura"]].head(15).to_string(index=False))
+
+    # Una fila por país × BU × mes: México trae varias líneas por factura
+    out = (df.groupby(["country", "brand", "month"], as_index=False)
+             .agg(invoice_id=("invoice_id", lambda s: " | ".join(dict.fromkeys(x for x in s if x))),
+                  impressions_billed=("impressions_billed", "sum"),
+                  cost_original=("cost", "sum"),
+                  currency=("currency", "first"),
+                  fx_rate=("fx_rate", "first"),
+                  invoice_lines=("cost", "size")))
+    out["cost_usd"] = out.cost_original / out.fx_rate
+    out["cpm_usd"] = out.cost_usd / out.impressions_billed.replace(0, np.nan) * 1000
+    out["impressions_billed"] = out.impressions_billed.round().astype("int64")
+    out["invoice_lines"] = out.invoice_lines.astype("int64")
+    out["source"] = f"sheet Facturas ({os.path.basename(path)})"
+    out["loaded_at"] = pd.Timestamp.now("UTC")
+    df = out[["country", "brand", "month", "invoice_id", "impressions_billed", "cost_usd", "cpm_usd",
+              "currency", "cost_original", "fx_rate", "invoice_lines", "source", "loaded_at"]]
+
+    mxn = df[df.currency == "MXN"]
+    print(f"{os.path.basename(path)}: {len(raw)} líneas → {len(df)} facturas (país × BU × mes) · "
+          f"{df.country.nunique()} países ({', '.join(sorted(df.country.unique()))}) · "
+          f"{df.month.min()} → {df.month.max()} · {df.impressions_billed.sum():,} impresiones · "
+          f"${df.cost_usd.sum():,.0f} USD"
+          + (f" (incluye {len(mxn)} facturas en MXN a {fx} = ${mxn.cost_usd.sum():,.0f})" if len(mxn) else ""))
     if dry:
         print(df.head(10).to_string(index=False))
         return
@@ -124,7 +165,9 @@ def main(path, dry):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    argv = sys.argv[1:]
+    args = [a for a in argv if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
-    main(args[0], "--dry-run" in sys.argv)
+    opt = lambda name, dflt: float(argv[argv.index(name) + 1]) if name in argv else dflt  # noqa: E731
+    main(args[0], "--dry-run" in argv, opt("--fx", FX_MXN), opt("--cpm-tol", 0.5))

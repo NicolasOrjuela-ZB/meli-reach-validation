@@ -62,6 +62,8 @@ GROUP BY 1,2,3,4,5,6,7,8,9,10
 
 
 # Facturas de CM (país × BU × mes). Pocas filas: se embeben tal cual.
+# Columnas explícitas a propósito: la tabla gana campos (currency, cost_original, fx_rate,
+# invoice_lines…) sin que esto cambie ni se rompa.
 Q_INV = f"""
 SELECT country, brand, FORMAT_DATE('%Y-%m', month) AS m, invoice_id,
   CAST(impressions_billed AS INT64) AS impressions_billed, cost_usd, cpm_usd
