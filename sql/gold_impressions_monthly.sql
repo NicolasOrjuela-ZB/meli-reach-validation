@@ -105,6 +105,8 @@ SELECT side, month, country, brand, platform_group, family, source_platform,
     WHEN name_other THEN 'Misma taxo, sin tool'
     WHEN side='CM' THEN 'Solo CM'
     ELSE 'Solo plataforma' END AS match_type,
+  -- SOCIAL: campo 6 de la taxonomía (lo compra el equipo de social). Se marca igual en CM y en plataforma.
+  STARTS_WITH(UPPER(IFNULL(SPLIT(line_name,'_')[SAFE_OFFSET(5)],'')), 'SOCIAL') AS es_social,
   tool_id, line_id, line_name, code3 AS network_code_raw, COALESCE(network_code_std, code3) AS network_code,
   partner, formato, campana, impressions
 FROM mm

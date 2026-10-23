@@ -53,6 +53,8 @@ SELECT
   t.network_code IS NOT NULL AS Network_Code_Estandar,
   t.partner AS Partner, t.formato AS Formato, t.plataforma_compra AS Plataforma_Compra,
   SPLIT(b.placement, '_')[SAFE_OFFSET(8)] AS Campana,
+  -- SOCIAL: campo 6 de la taxonomía (lo compra el equipo de social)
+  STARTS_WITH(UPPER(IFNULL(SPLIT(b.placement, '_')[SAFE_OFFSET(5)], '')), 'SOCIAL') AS Es_Social,
   b.platform AS Plataforma,
   CASE WHEN b.multi_unresolved THEN TRUE
        WHEN b.platform = 'Pinterest' AND t.plataforma_compra IS NOT NULL AND t.plataforma_compra <> 'PINTEREST' THEN TRUE

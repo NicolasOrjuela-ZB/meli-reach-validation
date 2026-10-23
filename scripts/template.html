@@ -138,6 +138,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
       <div class="f"><label>Partner</label><div class="ms" id="fPartner"></div></div>
       <div class="f"><label>Network code</label><div class="ms" id="fNetwork"></div></div>
       <div class="f"><label>Marca</label><div class="ms" id="fBrand"></div></div>
+      <div class="f"><label for="fSocial">SOCIAL</label><select id="fSocial"><option value="">Todas</option><option value="no">Sin SOCIAL</option><option value="yes">Solo SOCIAL</option></select></div>
       <div class="f" style="flex:1;min-width:240px"><label for="q">Buscar taxonomía / tool / placement ID</label><input type="search" id="q" placeholder="Ej. 27057035, PINTEREST-SPOT-HOME, MUNDIAL…"></div>
       <button class="btn" id="reset">Limpiar</button>
       <button class="btn primary" id="dl">Descargar tabla (CSV, todas las líneas)</button>
@@ -188,6 +189,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
       <div class="f"><label>Network code</label><div class="ms" id="iNetwork"></div></div>
       <div class="f"><label>Marca</label><div class="ms" id="iBrand"></div></div>
       <div class="f"><label>Tipo de cruce</label><div class="ms" id="iCruce"></div></div>
+      <div class="f"><label for="iSocial">SOCIAL</label><select id="iSocial"><option value="">Todas</option><option value="no">Sin SOCIAL</option><option value="yes">Solo SOCIAL</option></select></div>
       <div class="f" style="flex:1;min-width:220px"><label for="iq">Buscar taxonomía / tool / network</label><input type="search" id="iq" placeholder="Ej. 94980379, TT-INF, MUNDIAL…"></div>
       <button class="btn" id="iReset">Limpiar</button>
       <button class="btn primary" id="iDl">Descargar detalle (CSV)</button>
@@ -268,7 +270,9 @@ const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
 
 // filters
-const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),status:'valid',match:''};
+const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),status:'valid',match:'',social:''};
+// SOCIAL: campo 6 de la taxonomía. El filtro se aplica igual a CM y a plataforma para comparar lo mismo.
+const socialOk=(isSocial,mode)=>!mode||(mode==='yes'?!!isSocial:!isSocial);
 // Multiselect: botón + popup con checkboxes. Vacío = "Todos". El popup queda abierto para marcar varias opciones.
 function msInitAll(ids){ids.forEach(id=>{const root=$('#'+id);root.innerHTML='<button type="button" class="msb">Todos</button><div class="msp"></div>';
   root.querySelector('.msb').onclick=()=>{const was=root.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was)root.classList.add('open')}})}
@@ -285,6 +289,7 @@ const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platfor
 const BRANDNAME={ML:'Mercado Libre',MP:'Mercado Pago'};
 function passes(r,skip){
   for(const [,k,get] of DIMS){if(k===skip)continue;if(F[k].size&&!F[k].has(get(r)))return false}
+  if(!socialOk(r[K.Es_Social],F.social))return false;
   if(q&&!matchQ(r))return false;
   return true;
 }
@@ -294,7 +299,8 @@ function refreshOptions(){
     msFill($('#'+id),vals,F[k],all,k==='brand'?(v=>BRANDNAME[v]||v):null,()=>{page=0;render()});
   });
 }
-$('#reset').onclick=()=>{DIMS.forEach(([,k])=>F[k].clear());F.status='valid';F.match='';$('#q').value='';q='';page=0;render()};
+$('#fSocial').addEventListener('change',e=>{F.social=e.target.value;page=0;render()});
+$('#reset').onclick=()=>{DIMS.forEach(([,k])=>F[k].clear());F.status='valid';F.match='';F.social='';$('#fSocial').value='';$('#q').value='';q='';page=0;render()};
 let metric='impr',wmetric='iiee',q='',page=0,sortK='Impressions_CM',sortD=-1;
 $('#segMetric').onclick=e=>{if(!e.target.dataset.m)return;metric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawVar();drawStatus()};
 $('#segWeek').onclick=e=>{if(!e.target.dataset.m)return;wmetric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawWeek()};
@@ -310,6 +316,7 @@ function filtered(){
     if(F.partner.size&&!F.partner.has(partnerOf(r)))return false;
     if(F.brand.size&&!F.brand.has(brandOf(r)))return false;
     if(F.year.size&&!F.year.has(yearOf(r)))return false;
+    if(!socialOk(r[K.Es_Social],F.social))return false;
     const st=r[K.Reach_Status_CM];
     if(F.status==='valid'){if(!VALID.has(st))return false}else if(F.status!=='all'&&st!==F.status)return false;
     if(F.match==='matched'&&!r[K.Plataforma])return false;
@@ -448,21 +455,21 @@ $('#prev').onclick=()=>{page--;drawTable()};$('#next').onclick=()=>{page++;drawT
 // ---- CSV (client structure) ----
 // La descarga respeta los filtros y la búsqueda, pero incluye todas las líneas (no solo las de reach CM válido)
 $('#dl').onclick=()=>{const prev=F.status;F.status='all';const rows=sortRows(filtered());F.status=prev;
-  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato'];
+  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato','SOCIAL'];
   const p=v=>v==null?'':(v*100).toFixed(2)+'%';const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
-  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r))].join(',')));
+  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r)),r[K.Es_Social]?'sí':'no'].join(',')));
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`CM_vs_Plataformas_${DATA.cutoff}${F.country.size===1?'_'+[...F.country][0]:''}${F.platform.size===1?'_'+[...F.platform][0]:''}.csv`;a.click();URL.revokeObjectURL(a.href)};
 
 // ===== Pestaña Impresiones (gold_impressions_monthly, embebido columnar en DATA.imp) =====
 const IMPD=DATA.imp||null;let impInit=false,IM=null,cur3=[];
-const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),q:''};
+const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),social:'',q:''};
 const CROSS=['Misma tool y taxo','Misma tool, distinta taxo','Misma taxo, sin tool'];
 const MTYPES=[...CROSS,'Solo CM','Solo plataforma','Sin fuente de plataforma'];
 const crLbl=()=>F3.cruce.size===0?'Todos los cruces':F3.cruce.size===1?[...F3.cruce][0]:`${F3.cruce.size} tipos de cruce`;
 const PG_ORDER=['TikTok','Pinterest','DV360 · YouTube','DV360 · Open','DV360 · Deals','DV360 · DOOH','Medios directos','Meta','Google Ads','Twitter','Sin clasificar'];
 const pgSort2=(a,b)=>(PG_ORDER.indexOf(a)+1||99)-(PG_ORDER.indexOf(b)+1||99)||a.localeCompare(b);
 function impDecode(){const D=IMPD.dims;IM={months:IMPD.months,
-  lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],
+  lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],soc:!!a[11],
     ser:a[10]?a[10].split(',').map(s=>{const p=s.split(':');return [+p[0],parseInt(p[1],36)]}):[]}))};
   IM.years=[...new Set(IM.months.map(m=>m.slice(0,4)))].sort();
   const mi=Object.fromEntries(IM.months.map((m,i)=>[m,i]));
@@ -481,7 +488,8 @@ function covText(inv){
     .map(([y,cs])=>`${cs.sort().join(', ')} (${y})`).join(' · ')+'.';
 }
 const INVCOV=covText(IMPD&&IMPD.inv);
-const NOSPLIT='Total de la factura, no se abre por plataforma.';
+const NOSPLIT='Total de la factura, no se abre por plataforma ni por SOCIAL.';
+const noSplit=()=>'Total de la factura, no se abre por '+(F3.social?'SOCIAL':'plataforma')+'.';
 const DEFS=[
  ['CM total','Todas las impresiones que registró CM360 en el filtro (diario de CM). Incluye líneas sin data de plataforma (Meta, medios directos, Google Ads, Twitter) y líneas sin cruce.'],
  ['CM cruzado','Impresiones de CM solo de las líneas que también existen en la plataforma, según el tipo de cruce elegido (por defecto, misma tool).'],
@@ -496,7 +504,8 @@ const DEFS=[
  ['CPM facturado','Costo ÷ impresiones facturadas × 1.000.'],
  ['Impresiones en exceso','CM cruzado − plataforma cruzada; impresiones que CM contó y la plataforma no.'],
  ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],
- ['% de la factura','Monto reclamable ÷ costo facturado.']];
+ ['% de la factura','Monto reclamable ÷ costo facturado.'],
+ ['SOCIAL','Líneas compradas por el equipo de social (campo 6 de la taxonomía = SOCIAL). El filtro se aplica a CM y a plataforma a la vez para comparar las mismas líneas.']];
 const DEF=Object.fromEntries(DEFS);
 const tip=k=>` title="${esc(k+': '+(DEF[k]||''))}"`;
 const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
@@ -504,7 +513,8 @@ const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
 const inCr=(l,s)=>{const c=s||F3.cruce;return c.size?c.has(l.mt):CROSS.includes(l.mt)};
 const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas']];
 const iMatchQ=l=>F3.q.split(/\s+/).every(t=>[l.name,l.tool,l.nc,l.camp].join(' ').toLowerCase().includes(t));
-function iPass(l,skip){for(const [,k,get] of IDIMS){if(k===skip)continue;if(F3[k].size&&!F3[k].has(get(l)))return false}if(F3.q&&!iMatchQ(l))return false;return true}
+function iPass(l,skip){for(const [,k,get] of IDIMS){if(k===skip)continue;if(F3[k].size&&!F3[k].has(get(l)))return false}
+  if(!socialOk(l.soc,F3.social))return false;if(F3.q&&!iMatchQ(l))return false;return true}
 function iOpts(){IDIMS.forEach(([id,k,get,all])=>{const vals=[...new Set(IM.lines.filter(l=>iPass(l,k)).map(get).filter(Boolean))].sort(k==='pg'?pgSort2:undefined);
   msFill($('#'+id),vals,F3[k],all,k==='brand'?(v=>BRANDNAME[v]||v):null,iRender)});
   msFill($('#iYear'),IM.years,F3.year,'Todos',null,iRender);
@@ -541,7 +551,7 @@ function iKpis(){let cmT=0,plT=0,cmX=0,plX=0;
    grp('cm','CM360',kpiCard('CM total',fmt(cmT),'Todas las líneas de CM en el filtro')+kpiCard('CM cruzado',fmt(cmX),`${pctN(cmX,cmT)} del total CM · ${crLbl()}`))+
    grp('pl','Plataforma',kpiCard('Plataforma total',fmt(plT),'Data directa DV360 · TikTok · Pinterest')+kpiCard('Plataforma cruzada',fmt(plX),`${pctN(plX,plT)} del total plataforma`)+varCard)+
    grp('bill','Facturación CM',
-     kpiCard('Impresiones facturadas',b.inv?fmt(b.bi):'—',b.inv?NOSPLIT:INVCOV)+
+     kpiCard('Impresiones facturadas',b.inv?fmt(b.bi):'—',b.inv?noSplit():INVCOV)+
      kpiCard('Costo facturado',b.inv?usd(b.bc):'—',note)+
      kpiCard('CPM facturado',cpm?'$'+cpm.toFixed(3):'—','Costo ÷ impresiones facturadas × 1.000')+
      kpiCard('Impresiones en exceso',b.inv?fmt(b.ex):'—','CM cruzado − plataforma cruzada, solo meses con factura')+
@@ -616,10 +626,11 @@ function iToolsTbl(){const g={};
 if(IMPD){
   $('#iDefs').innerHTML=DEFS.map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(v)}</div>`).join('')+`<div style="color:var(--ink-3)">${INVCOV} Los meses sin factura muestran “sin factura”. ${NOSPLIT}</div>`;
   $('#iDefsBtn').onclick=()=>{const d=$('#iDefs'),on=d.style.display==='none';d.style.display=on?'':'none';$('#iDefsBtn').setAttribute('aria-expanded',on)};
+  $('#iSocial').addEventListener('change',e=>{F3.social=e.target.value;iRender()});
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
-  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
+  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce'].forEach(k=>F3[k].clear());F3.q='';F3.social='';$('#iSocial').value='';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
-    const head=['Lado','País','Marca','Plataforma','Tipo de cruce','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
+    const head=['Lado','País','Marca','Plataforma','Tipo de cruce','SOCIAL','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
       'VAR impresiones','CPM facturado USD','Impresiones en exceso','Monto reclamable USD'];
     const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
     const lines=[head.join(',')].concat(cur3.map(l=>{const by={};for(const [i,v] of l.ser)by[i]=v;
@@ -627,7 +638,7 @@ if(IMPD){
       let ex=0,re=0;const x=inCr(l);
       if(x)for(const [i,v] of l.ser){if(!mOk(i))continue;const iv=INV[l.c+'|'+l.b+'|'+i];if(!iv)continue;
         const d=l.side===0?v:-v;ex+=d;re+=d*iv[6]/1000}
-      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
+      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),l.soc?'sí':'no',l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
         x?-ex:'',ex?(re/ex*1000).toFixed(3):'',x?ex:'',x?re.toFixed(2):''].join(',')}));
     const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Impresiones_mensuales_${DATA.cutoff}.csv`;a.click();URL.revokeObjectURL(a.href)}}
 const tabs=$('#viewTabs');

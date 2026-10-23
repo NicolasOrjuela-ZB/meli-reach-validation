@@ -18,7 +18,7 @@ OUT = os.path.join(ROOT, "docs", "index.html")
 KEYS = ["Advertiser", "Placement", "Placement_ID", "TOOL", "Country", "Chosen_Frequency",
         "Impressions_CM", "Impressions_Plataforma", "Reach_CM", "Reach_Plataforma", "IIEE_CM", "IIEE_Plataforma",
         "Fecha_inicio", "Fecha_fin", "Network_Code", "Campana", "Plataforma", "Match", "Reach_Status_CM", "En_curso",
-        "Cruce_Dudoso"]
+        "Cruce_Dudoso", "Es_Social"]
 
 Q_LINES = f"""
 SELECT {", ".join(KEYS)}
@@ -53,11 +53,11 @@ Q_IMP = f"""
 SELECT side, country, brand,
   -- DV360 · Otros son deals/medios vía DV sin network code claro: se consolidan en Deals
   REPLACE(platform_group, 'DV360 · Otros', 'DV360 · Deals') AS platform_group,
-  match_type, IFNULL(tool_id,'') tool_id, line_name,
+  match_type, es_social, IFNULL(tool_id,'') tool_id, line_name,
   IFNULL(network_code,'') network_code, IFNULL(partner,'') partner, IFNULL(campana,'') campana,
   ARRAY_AGG(STRUCT(FORMAT_DATE('%Y-%m', month) AS m, impressions AS i) ORDER BY month) AS ser
 FROM `{DS}.gold_impressions_monthly`
-GROUP BY 1,2,3,4,5,6,7,8,9,10
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11
 """
 
 
@@ -99,7 +99,7 @@ def encode_imp(rows):
         lines.append([0 if r["side"] == "CM" else 1, dx("country", r["country"]), dx("brand", r["brand"]),
                       dx("pg", r["platform_group"]), dx("mt", r["match_type"]), r["tool_id"],
                       dx("name", r["line_name"]), dx("nc", r["network_code"]), dx("partner", r["partner"]),
-                      dx("camp", r["campana"]), ser])
+                      dx("camp", r["campana"]), ser, 1 if r["es_social"] else 0])
     return {"months": months, "dims": dims, "lines": lines}
 
 
