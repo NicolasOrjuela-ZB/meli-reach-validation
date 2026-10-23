@@ -294,12 +294,16 @@ const GUIDE=DATA.guide||[];
 const L2ORDER=['FEEL','THINK','THINK (Win Trust)','DO','DO (Win Habits)','SOCIAL AO','SOCIAL','OTHERS',
   'ACTIVACIONES PUNTUALES','PARQUE FIJO','BRANDING · sin nivel','Sin clasificar'];
 const l2rank=v=>{const i=L2ORDER.indexOf(v);return i<0?L2ORDER.length:i};
-const tcSort=(a,b)=>{const [a2,a3]=a.split(' § '),[b2,b3]=b.split(' § ');
-  return l2rank(a2)-l2rank(b2)||a2.localeCompare(b2)||a3.localeCompare(b3)};
+// Agrupación del filtro: lo que cuelga de Level 1 = OTHERS va junto en un solo grupo OTHERS
+// (ML trae Acts. Puntuales y Parque Fijo con Level 2 propio; en el filtro se muestran como en MP).
+const L2GROUP={};GUIDE.forEach(g=>{L2GROUP[g[2]]=g[1]==='OTHERS'?'OTHERS':g[2]});
+const tcGroup=v=>{const l2=v.split(' § ')[0];return L2GROUP[l2]||l2};
+const tcSort=(a,b)=>{const ga=tcGroup(a),gb=tcGroup(b);
+  return l2rank(ga)-l2rank(gb)||ga.localeCompare(gb)||a.localeCompare(b)};
 // SOCIAL = campo 6 empieza por SOCIAL, o sea las entradas de la guía con prefijo SOCIAL
 // (ML · SOCIAL AO · Fashion y MP · THINK (Win Trust) · Social).
 const SOCIALSET=new Set(GUIDE.filter(g=>g[4]==='SOCIAL').map(g=>`${g[2]} § ${g[3]}`));
-const tcItems=(counts)=>[...counts.keys()].sort(tcSort).map(v=>({v,lbl:v.split(' § ')[1],n:counts.get(v),g:v.split(' § ')[0]}));
+const tcItems=(counts)=>[...counts.keys()].sort(tcSort).map(v=>({v,lbl:v.split(' § ')[1],n:counts.get(v),g:tcGroup(v)}));
 // Estado del control rápido: se deduce de la selección, que es la única fuente de verdad
 function socialMode(sel,universe){
   if(!sel.size)return '';
