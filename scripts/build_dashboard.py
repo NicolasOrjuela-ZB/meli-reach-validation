@@ -18,7 +18,13 @@ OUT = os.path.join(ROOT, "docs", "index.html")
 KEYS = ["Advertiser", "Placement", "Placement_ID", "TOOL", "Country", "Chosen_Frequency",
         "Impressions_CM", "Impressions_Plataforma", "Reach_CM", "Reach_Plataforma", "IIEE_CM", "IIEE_Plataforma",
         "Fecha_inicio", "Fecha_fin", "Network_Code", "Campana", "Plataforma", "Match", "Reach_Status_CM", "En_curso",
-        "Cruce_Dudoso", "Es_Social"]
+        "Cruce_Dudoso", "TC_Level2", "TC_Level3"]
+
+# Guía oficial de tipos de campaña: se embebe para el glosario y el orden del filtro
+Q_GUIDE = f"""
+SELECT bu, level1, level2, level3, prefix, definicion, en_guia
+FROM `{DS}.bronze_taxonomy_campaign_types` ORDER BY bu, level1, level2, level3, prefix
+"""
 
 Q_LINES = f"""
 SELECT {", ".join(KEYS)}
@@ -53,11 +59,11 @@ Q_IMP = f"""
 SELECT side, country, brand,
   -- DV360 · Otros son deals/medios vía DV sin network code claro: se consolidan en Deals
   REPLACE(platform_group, 'DV360 · Otros', 'DV360 · Deals') AS platform_group,
-  match_type, es_social, IFNULL(tool_id,'') tool_id, line_name,
+  match_type, tc_level2, tc_level3, IFNULL(tool_id,'') tool_id, line_name,
   IFNULL(network_code,'') network_code, IFNULL(partner,'') partner, IFNULL(campana,'') campana,
   ARRAY_AGG(STRUCT(FORMAT_DATE('%Y-%m', month) AS m, impressions AS i) ORDER BY month) AS ser
 FROM `{DS}.gold_impressions_monthly`
-GROUP BY 1,2,3,4,5,6,7,8,9,10,11
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12
 """
 
 
@@ -83,7 +89,7 @@ def encode_imp(rows):
     """Codificación columnar con diccionarios: meses y dimensiones indexados, serie mensual "idx:valor36,…" (base 36)."""
     months = sorted({s["m"] for r in rows for s in r["ser"]})
     midx = {m: i for i, m in enumerate(months)}
-    dims = {k: [] for k in ("country", "brand", "pg", "mt", "nc", "partner", "camp", "name")}
+    dims = {k: [] for k in ("country", "brand", "pg", "mt", "nc", "partner", "camp", "name", "tc")}
     didx = {k: {} for k in dims}
 
     def dx(k, v):
@@ -99,7 +105,8 @@ def encode_imp(rows):
         lines.append([0 if r["side"] == "CM" else 1, dx("country", r["country"]), dx("brand", r["brand"]),
                       dx("pg", r["platform_group"]), dx("mt", r["match_type"]), r["tool_id"],
                       dx("name", r["line_name"]), dx("nc", r["network_code"]), dx("partner", r["partner"]),
-                      dx("camp", r["campana"]), ser, 1 if r["es_social"] else 0])
+                      dx("camp", r["campana"]), ser,
+                      dx("tc", f'{r["tc_level2"]} § {r["tc_level3"]}')])
     return {"months": months, "dims": dims, "lines": lines}
 
 
@@ -114,6 +121,8 @@ def main():
     imp = encode_imp([dict(r) for r in client.query(Q_IMP).result()])
     imp["inv"] = [[r["country"], r["brand"], r["m"], r["invoice_id"], r["impressions_billed"],
                    round(r["cost_usd"], 2), round(r["cpm_usd"], 6)] for r in client.query(Q_INV).result()]
+    guide = [[r["bu"], r["level1"], r["level2"], r["level3"], r["prefix"], r["definicion"], r["en_guia"]]
+             for r in client.query(Q_GUIDE).result()]
     if not lines or not weekly:
         sys.exit("Sin datos: no se regenera el dashboard")
 
@@ -125,7 +134,8 @@ def main():
     L = [[cell(r.get(k)) for k in KEYS] for r in lines]
     W = [[w["country"], w["platform"], cell(w["week_start"]), w["impr_cm_m"], w["impr_pl"], w["reach_cm_m"], w["reach_pl"],
           w["iiee_cm_m"], w["iiee_pl"], w["lines"], w["lines_m"]] for w in weekly]
-    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "nc": nc, "imp": imp, "cutoff": cell(cutoff),
+    data = json.dumps({"keys": KEYS, "lines": L, "weekly": W, "wl": wl, "nc": nc, "imp": imp, "guide": guide,
+                       "cutoff": cell(cutoff),
                        "generated": datetime.date.today().isoformat()}, separators=(",", ":"), ensure_ascii=False)
     html = open(TEMPLATE, encoding="utf-8").read()
     assert "/*__DATA__*/" in html, "template.html sin marcador /*__DATA__*/"
@@ -133,7 +143,7 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w", encoding="utf-8").write(html)
     print(f"OK docs/index.html · {len(L)} líneas · {len(W)} filas semanales · {len(imp['lines'])} líneas de impresiones "
-          f"· {len(imp['inv'])} facturas "
+          f"· {len(imp['inv'])} facturas · {len(guide)} tipos de campaña "
           f"({len(json.dumps(imp, separators=(',', ':')))//1024} KB) · corte {cutoff} · {len(html)//1024} KB")
 
 

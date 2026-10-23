@@ -29,10 +29,25 @@ iiee_cm AS (
 iiee_pl AS (SELECT platform, tool_id, SUM(IF(iiee_status='OK', reach_at_frequency_platform, 0)) iiee_platform
   FROM `mbw-spl-brazil.ds_meli_reach_validation.gold_platform_iiee_weekly` WHERE tool_id IS NOT NULL GROUP BY 1,2),
 cm AS (SELECT placement_id, advertiser FROM `mbw-spl-brazil.ds_meli_reach_validation.silver_cm_lines`),
-base AS (
-  SELECT x.*, cm.advertiser, UPPER(TRIM(x.taxo_platform)) AS nc_raw
+base0 AS (
+  SELECT x.*, cm.advertiser, UPPER(TRIM(x.taxo_platform)) AS nc_raw,
+    UPPER(IFNULL(SPLIT(x.placement,'_')[SAFE_OFFSET(5)],'')) AS campo6,
+    -- BU para la guía: campo 2 de la taxonomía si dice ML/MP, si no la BU del advertiser
+    IF(UPPER(IFNULL(SPLIT(x.placement,'_')[SAFE_OFFSET(1)],'')) IN ('ML','MP'),
+       UPPER(SPLIT(x.placement,'_')[SAFE_OFFSET(1)]),
+       IF(cm.advertiser LIKE '%MercadoPago%','MP','ML')) AS tc_bu
   FROM `mbw-spl-brazil.ds_meli_reach_validation.gold_cm_vs_platform` x LEFT JOIN cm USING(placement_id)
-  WHERE x.match_type IN ('TOOL_ID','NAME','CM_ONLY'))
+  WHERE x.match_type IN ('TOOL_ID','NAME','CM_ONLY')),
+-- Tipo de campaña: del campo 6 contra la guía oficial, tomando el prefijo más largo que calce
+tc_keys AS (SELECT DISTINCT tc_bu, campo6 FROM base0),
+tc AS (
+  SELECT k.tc_bu, k.campo6,
+    ARRAY_AGG(STRUCT(g.level1, g.level2, g.level3, g.en_guia) ORDER BY LENGTH(g.prefix) DESC LIMIT 1)[OFFSET(0)] AS t
+  FROM tc_keys k
+  JOIN `mbw-spl-brazil.ds_meli_reach_validation.bronze_taxonomy_campaign_types` g
+    ON g.bu = k.tc_bu AND (k.campo6 = g.prefix OR STARTS_WITH(k.campo6, CONCAT(g.prefix,'-')))
+  GROUP BY 1,2),
+base AS (SELECT b.*, tc.t AS tc FROM base0 b LEFT JOIN tc USING (tc_bu, campo6))
 SELECT
   b.advertiser AS Advertiser, b.placement AS Placement, b.placement_id AS Placement_ID, b.tool_id AS TOOL, b.country AS Country,
   IF(f.chosen_frequency IS NULL, 'No Match base Meli', CONCAT('+', CAST(f.chosen_frequency AS STRING))) AS Chosen_Frequency,
@@ -53,8 +68,11 @@ SELECT
   t.network_code IS NOT NULL AS Network_Code_Estandar,
   t.partner AS Partner, t.formato AS Formato, t.plataforma_compra AS Plataforma_Compra,
   SPLIT(b.placement, '_')[SAFE_OFFSET(8)] AS Campana,
-  -- SOCIAL: campo 6 de la taxonomía (lo compra el equipo de social)
-  STARTS_WITH(UPPER(IFNULL(SPLIT(b.placement, '_')[SAFE_OFFSET(5)], '')), 'SOCIAL') AS Es_Social,
+  b.tc_bu AS BU,
+  IFNULL(b.tc.level1,'Sin clasificar') AS TC_Level1,
+  IFNULL(b.tc.level2,'Sin clasificar') AS TC_Level2,
+  IFNULL(b.tc.level3,'Sin clasificar') AS TC_Level3,
+  IFNULL(b.tc.en_guia, FALSE) AS TC_En_Guia,
   b.platform AS Plataforma,
   CASE WHEN b.multi_unresolved THEN TRUE
        WHEN b.platform = 'Pinterest' AND t.plataforma_compra IS NOT NULL AND t.plataforma_compra <> 'PINTEREST' THEN TRUE

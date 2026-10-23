@@ -18,6 +18,8 @@ Dashboard y pipeline para comparar impresiones, reach total e IIEE de **Campaign
 | Base cliente (chosen frequency) y Adverity | Ya están en BigQuery | Automático |
 | Maestro de network codes | Exportar las hojas "NETWORK CODES + LISTA MEDIOS" y "NETWORK CODES" del doc *Medios Matt - Ajustes TAXONOMIA* y cargar `bronze_taxonomy_network_codes` (reemplazo completo) | Cuando cambie la taxonomía |
 | Facturas de CM | Exportar la hoja "Facturas" a CSV y correr `python scripts/load_invoices.py facturas.csv` (reemplaza `bronze_cm_invoices` completa) | Cuando lleguen facturas nuevas |
+| Guía de tipos de campaña | Actualizar `bronze_taxonomy_campaign_types` (bu, prefix, level1/2/3, definicion, en_guia). El dashboard la lee para el filtro y el glosario | Cuando cambie la guía de taxonomía |
+| Vistas | `python scripts/apply_sql.py --all` aplica los `.sql` de `sql/` en BigQuery (`--dry-run` solo valida) | Cuando cambie una definición |
 
 ### Facturas de CM
 

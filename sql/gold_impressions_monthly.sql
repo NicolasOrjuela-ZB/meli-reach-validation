@@ -46,6 +46,10 @@ pl AS (
 lines AS (SELECT * FROM cm UNION ALL SELECT * FROM pl),
 enr AS (
   SELECT l.*,
+    UPPER(IFNULL(SPLIT(l.line_name,'_')[SAFE_OFFSET(5)],'')) AS campo6,
+    -- BU para la guía: campo 2 de la taxonomía si dice ML/MP, si no la BU del advertiser
+    IF(UPPER(IFNULL(SPLIT(l.line_name,'_')[SAFE_OFFSET(1)],'')) IN ('ML','MP'),
+       UPPER(SPLIT(l.line_name,'_')[SAFE_OFFSET(1)]), l.brand) AS tc_bu,
     UPPER(SPLIT(l.line_name,'_')[SAFE_OFFSET(2)]) AS code3,
     REGEXP_EXTRACT(l.line_name, r'_(\d{8})(?:[^0-9]|$)') AS tool_id,
     UPPER(REGEXP_REPLACE(l.line_name, r'\s+', '')) AS name_key,
@@ -96,7 +100,16 @@ m0 AS (
   FROM fam f),
 mm AS (
   SELECT m0.* REPLACE (IF(m0.side='PLATAFORMA' AND m0.tool_other, COALESCE(tg.cm_group, m0.platform_group), m0.platform_group) AS platform_group)
-  FROM m0 LEFT JOIN tg ON tg.family = m0.family AND tg.tool_id = m0.tool_id)
+  FROM m0 LEFT JOIN tg ON tg.family = m0.family AND tg.tool_id = m0.tool_id),
+-- Tipo de campaña: del campo 6 contra la guía oficial, tomando el prefijo más largo que calce
+tc_keys AS (SELECT DISTINCT tc_bu, campo6 FROM mm),
+tc AS (
+  SELECT k.tc_bu, k.campo6,
+    ARRAY_AGG(STRUCT(g.level1, g.level2, g.level3, g.en_guia) ORDER BY LENGTH(g.prefix) DESC LIMIT 1)[OFFSET(0)] AS t
+  FROM tc_keys k
+  JOIN `mbw-spl-brazil.ds_meli_reach_validation.bronze_taxonomy_campaign_types` g
+    ON g.bu = k.tc_bu AND (k.campo6 = g.prefix OR STARTS_WITH(k.campo6, CONCAT(g.prefix,'-')))
+  GROUP BY 1,2)
 SELECT side, month, country, brand, platform_group, family, source_platform,
   CASE
     WHEN side='CM' AND family NOT IN ('DV360','TikTok','Pinterest') THEN 'Sin fuente de plataforma'
@@ -105,8 +118,11 @@ SELECT side, month, country, brand, platform_group, family, source_platform,
     WHEN name_other THEN 'Misma taxo, sin tool'
     WHEN side='CM' THEN 'Solo CM'
     ELSE 'Solo plataforma' END AS match_type,
-  -- SOCIAL: campo 6 de la taxonomía (lo compra el equipo de social). Se marca igual en CM y en plataforma.
-  STARTS_WITH(UPPER(IFNULL(SPLIT(line_name,'_')[SAFE_OFFSET(5)],'')), 'SOCIAL') AS es_social,
+  tc_bu, campo6,
+  IFNULL(tc.t.level1,'Sin clasificar') AS tc_level1,
+  IFNULL(tc.t.level2,'Sin clasificar') AS tc_level2,
+  IFNULL(tc.t.level3,'Sin clasificar') AS tc_level3,
+  IFNULL(tc.t.en_guia, FALSE) AS tc_en_guia,
   tool_id, line_id, line_name, code3 AS network_code_raw, COALESCE(network_code_std, code3) AS network_code,
   partner, formato, campana, impressions
-FROM mm
+FROM mm LEFT JOIN tc USING (tc_bu, campo6)

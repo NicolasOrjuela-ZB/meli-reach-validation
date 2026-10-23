@@ -87,6 +87,10 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
 .ms.open .msp{display:block}
 .msp label{display:flex;gap:7px;align-items:center;padding:4px 7px;border-radius:6px;font-size:12.5px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500;white-space:nowrap}
 .msp label:hover{background:var(--surface-2)}
+.msp label.sub{padding-left:22px}
+.msp label.gh{font-weight:700;margin-top:4px;border-top:1px solid var(--line);padding-top:6px}
+.msp label.stale span{color:var(--ink-3);font-style:italic}
+.msp .cnt{margin-left:auto;padding-left:14px;color:var(--ink-3);font-weight:500;font-variant-numeric:tabular-nums}
 .shrow{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:4px 12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
 .shrow:last-child{border-bottom:0}
 .shlbl{font-size:12px;color:var(--ink-2);font-weight:600}
@@ -104,10 +108,21 @@ th.hpl,td.tpl{background:rgba(235,104,52,.07)}
 th.hcmp,td.tcmp{background:rgba(0,0,0,.035)}
 th.hbill,td.tbill{background:rgba(46,158,91,.07)}
 th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2)}
-.defs{background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12.5px;line-height:1.5;columns:2;column-gap:28px}
-.defs div{break-inside:avoid;margin-bottom:7px}
+.defs{background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12.5px;line-height:1.5}
+.defs .defgrid{columns:2;column-gap:28px}
+.defs .defgrid>div{break-inside:avoid;margin-bottom:7px}
 .defs b{color:var(--ink)}
-@media (max-width:900px){.defs{columns:1}}
+.guide{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.guide h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.gcols{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.gbu h4{margin:0 0 6px;font-size:13px}
+.gl1{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);margin-top:8px}
+.gl2{font-weight:700;margin-top:5px}
+.gl3{margin:2px 0 5px 12px;color:var(--ink-2);font-size:12px}
+.gl3 code{background:var(--surface);padding:0 4px;border-radius:4px;font-size:11px}
+.gl3 i{color:var(--ink-3)}
+.gnote{margin-top:10px;color:var(--ink-3)}
+@media (max-width:900px){.defs .defgrid,.gcols{columns:1;grid-template-columns:1fr}}
 @media (max-width:1180px){.two,.three{grid-template-columns:1fr}}
 @media (max-width:700px){.app{grid-template-columns:1fr}.rail{display:none}main{padding:14px 16px 40px}.kpis{grid-template-columns:1fr}}
 </style>
@@ -132,13 +147,13 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
     <div id="vReach">
     <section class="filters" aria-label="Filtros">
       <div class="f"><label>Año (inicio)</label><div class="ms" id="fYear"></div></div>
+      <div class="f"><label>BU</label><div class="ms" id="fBrand"></div></div>
       <div class="f"><label>País</label><div class="ms" id="fCountry"></div></div>
       <div class="f"><label>Plataforma</label><div class="ms" id="fPlatform"></div></div>
       <div class="f"><label>Campaña</label><div class="ms" id="fCampaign"></div></div>
       <div class="f"><label>Partner</label><div class="ms" id="fPartner"></div></div>
       <div class="f"><label>Network code</label><div class="ms" id="fNetwork"></div></div>
-      <div class="f"><label>Marca</label><div class="ms" id="fBrand"></div></div>
-      <div class="f"><label for="fSocial">SOCIAL</label><select id="fSocial"><option value="">Todas</option><option value="no">Sin SOCIAL</option><option value="yes">Solo SOCIAL</option></select></div>
+      <div class="f"><label>Tipo de campaña</label><div class="ms" id="fTC"></div></div>
       <div class="f" style="flex:1;min-width:240px"><label for="q">Buscar taxonomía / tool / placement ID</label><input type="search" id="q" placeholder="Ej. 27057035, PINTEREST-SPOT-HOME, MUNDIAL…"></div>
       <button class="btn" id="reset">Limpiar</button>
       <button class="btn primary" id="dl">Descargar tabla (CSV, todas las líneas)</button>
@@ -181,15 +196,15 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
     <div id="vImp" style="display:none">
     <section class="filters" aria-label="Filtros de impresiones">
       <div class="f"><label>Año</label><div class="ms" id="iYear"></div></div>
+      <div class="f"><label>BU</label><div class="ms" id="iBrand"></div></div>
       <div class="f"><label>Mes</label><div class="ms" id="iMonth"></div></div>
       <div class="f"><label>País</label><div class="ms" id="iCountry"></div></div>
       <div class="f"><label>Plataforma</label><div class="ms" id="iPlatform"></div></div>
       <div class="f"><label>Campaña</label><div class="ms" id="iCampaign"></div></div>
       <div class="f"><label>Partner</label><div class="ms" id="iPartner"></div></div>
       <div class="f"><label>Network code</label><div class="ms" id="iNetwork"></div></div>
-      <div class="f"><label>Marca</label><div class="ms" id="iBrand"></div></div>
+      <div class="f"><label>Tipo de campaña</label><div class="ms" id="iTC"></div></div>
       <div class="f"><label>Tipo de cruce</label><div class="ms" id="iCruce"></div></div>
-      <div class="f"><label for="iSocial">SOCIAL</label><select id="iSocial"><option value="">Todas</option><option value="no">Sin SOCIAL</option><option value="yes">Solo SOCIAL</option></select></div>
       <div class="f" style="flex:1;min-width:220px"><label for="iq">Buscar taxonomía / tool / network</label><input type="search" id="iq" placeholder="Ej. 94980379, TT-INF, MUNDIAL…"></div>
       <button class="btn" id="iReset">Limpiar</button>
       <button class="btn primary" id="iDl">Descargar detalle (CSV)</button>
@@ -200,7 +215,8 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
     <div id="iKpis"></div>
 
     <section class="card" style="margin-top:14px">
-      <div class="cardhead"><div><h3>Impresiones por mes · CM vs plataforma</h3><div class="hint">Barras: impresiones cruzadas según el tipo de cruce elegido. La tabla agrega los totales, la cobertura de cada lado y la factura de CM del mes.</div></div></div>
+      <div class="cardhead"><div><h3>Impresiones por mes · CM vs plataforma</h3><div class="hint">Barras: impresiones cruzadas según el tipo de cruce elegido. La tabla agrega los totales, la cobertura de cada lado y la factura de CM del mes.</div></div>
+        <div class="seg" id="iSeg" title="Atajo del filtro Tipo de campaña: SOCIAL es el campo 6 de la taxonomía (ML Fashion y MP Social)"><button data-s="" class="on">Todas</button><button data-s="no">Sin SOCIAL</button><button data-s="yes">Solo SOCIAL</button></div></div>
       <div class="legend"><span><span class="sw" style="background:var(--s-cm)"></span>CM360 cruzado</span><span><span class="sw" style="background:var(--s-pl)"></span>Plataforma cruzada</span></div>
       <div id="iChart"></div>
       <div class="tablewrap" style="max-height:44vh;margin-top:10px"><table id="iMonthly"><thead></thead><tbody></tbody></table></div>
@@ -267,40 +283,80 @@ const pSort=(a,b)=>(PORDER.indexOf(a)+1||99)-(PORDER.indexOf(b)+1||99)||a.locale
 const PCOLG={'DV360 · Open':'#2a78d6','DV360 · YouTube':'#e34948','DV360 · Deals':'#6250d6',Pinterest:'#eb6834',TikTok:'#1baf7a'};
 const brandOf=r=>r[K.Advertiser]&&r[K.Advertiser].includes('MercadoPago')?'MP':'ML';
 const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
+const tcOf=r=>`${r[K.TC_Level2]} § ${r[K.TC_Level3]}`;
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
 
 // filters
-const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),status:'valid',match:'',social:''};
-// SOCIAL: campo 6 de la taxonomía. El filtro se aplica igual a CM y a plataforma para comparar lo mismo.
-const socialOk=(isSocial,mode)=>!mode||(mode==='yes'?!!isSocial:!isSocial);
+const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),tc:new Set(),status:'valid',match:''};
+// ---- Tipo de campaña (guía oficial: bronze_taxonomy_campaign_types) ----
+// El valor del filtro es "Level 2 § Level 3"; en el popup se agrupa por Level 2.
+const GUIDE=DATA.guide||[];
+const L2ORDER=['FEEL','THINK','THINK (Win Trust)','DO','DO (Win Habits)','SOCIAL AO','SOCIAL','OTHERS',
+  'ACTIVACIONES PUNTUALES','PARQUE FIJO','BRANDING · sin nivel','Sin clasificar'];
+const l2rank=v=>{const i=L2ORDER.indexOf(v);return i<0?L2ORDER.length:i};
+const tcSort=(a,b)=>{const [a2,a3]=a.split(' § '),[b2,b3]=b.split(' § ');
+  return l2rank(a2)-l2rank(b2)||a2.localeCompare(b2)||a3.localeCompare(b3)};
+// SOCIAL = campo 6 empieza por SOCIAL, o sea las entradas de la guía con prefijo SOCIAL
+// (ML · SOCIAL AO · Fashion y MP · THINK (Win Trust) · Social).
+const SOCIALSET=new Set(GUIDE.filter(g=>g[4]==='SOCIAL').map(g=>`${g[2]} § ${g[3]}`));
+const tcItems=(counts)=>[...counts.keys()].sort(tcSort).map(v=>({v,lbl:v.split(' § ')[1],n:counts.get(v),g:v.split(' § ')[0]}));
+// Estado del control rápido: se deduce de la selección, que es la única fuente de verdad
+function socialMode(sel,universe){
+  if(!sel.size)return '';
+  const all=[...sel];
+  if(all.length===SOCIALSET.size&&all.every(v=>SOCIALSET.has(v)))return 'yes';
+  const rest=universe.filter(v=>!SOCIALSET.has(v));
+  if(all.length===rest.length&&rest.every(v=>sel.has(v)))return 'no';
+  return '';
+}
+function setSocial(sel,universe,mode){sel.clear();
+  if(mode==='yes')SOCIALSET.forEach(v=>sel.add(v));
+  else if(mode==='no')universe.filter(v=>!SOCIALSET.has(v)).forEach(v=>sel.add(v));}
+function segSync(seg,mode){[...seg.children].forEach(b=>b.classList.toggle('on',b.dataset.s===mode))}
 // Multiselect: botón + popup con checkboxes. Vacío = "Todos". El popup queda abierto para marcar varias opciones.
 function msInitAll(ids){ids.forEach(id=>{const root=$('#'+id);root.innerHTML='<button type="button" class="msb">Todos</button><div class="msp"></div>';
   root.querySelector('.msb').onclick=()=>{const was=root.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was)root.classList.add('open')}})}
 document.addEventListener('click',e=>{if(!e.target.closest('.ms'))document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'))});
-function msFill(root,vals,sel,all,labelOf,onChange){
-  [...sel].forEach(v=>{if(!vals.includes(v))sel.delete(v)});
-  root.querySelector('.msp').innerHTML=`<label><input type="checkbox" data-all="1" ${sel.size?'':'checked'}><span>${all}</span></label>`+
-    vals.map((v,i)=>`<label><input type="checkbox" data-i="${i}" ${sel.has(v)?'checked':''}><span>${esc(labelOf?labelOf(v):v)}</span></label>`).join('');
-  root.querySelectorAll('.msp input').forEach(ch=>ch.onchange=()=>{if(ch.dataset.all){sel.clear()}else{const v=vals[+ch.dataset.i];ch.checked?sel.add(v):sel.delete(v)}onChange()});
-  root.querySelector('.msb').textContent=sel.size===0?all:sel.size===1?(labelOf?labelOf([...sel][0]):[...sel][0]):`${sel.size} seleccionados`}
-msInitAll(['fYear','fCountry','fPlatform','fCampaign','fPartner','fNetwork','fBrand','iYear','iMonth','iCountry','iPlatform','iCampaign','iPartner','iNetwork','iBrand','iCruce']);
+// items: [{v, lbl, n, g}] con el conteo de líneas que quedan al aplicar los DEMÁS filtros.
+// Lo que sigue marcado pero ya no existe con esos filtros se muestra en gris con conteo 0.
+function msFill(root,items,sel,all,onChange){
+  const have=new Set(items.map(i=>i.v));
+  const list=items.concat([...sel].filter(v=>!have.has(v)).map(v=>({v,lbl:v.split(' § ').pop(),n:0,stale:true})));
+  const opt=(it,i)=>`<label class="${it.stale?'stale':''}${it.g?' sub':''}"><input type="checkbox" data-i="${i}" ${sel.has(it.v)?'checked':''}><span>${esc(it.lbl||it.v)}</span><b class="cnt">${fmtN(it.n)}</b></label>`;
+  let html=`<label><input type="checkbox" data-all="1" ${sel.size?'':'checked'}><span>${all}</span></label>`,g=null;
+  list.forEach((it,i)=>{
+    if(it.g&&it.g!==g){g=it.g;const kids=list.filter(x=>x.g===g),on=kids.every(x=>sel.has(x.v));
+      html+=`<label class="gh"><input type="checkbox" data-g="${esc(g)}" ${on?'checked':''}><span>${esc(g)}</span><b class="cnt">${fmtN(kids.reduce((a,x)=>a+x.n,0))}</b></label>`}
+    html+=opt(it,i)});
+  root.querySelector('.msp').innerHTML=html;
+  root.querySelectorAll('.msp input').forEach(ch=>ch.onchange=()=>{
+    if(ch.dataset.all)sel.clear();
+    else if(ch.dataset.g!==undefined)list.filter(x=>x.g===ch.dataset.g).forEach(x=>ch.checked?sel.add(x.v):sel.delete(x.v));
+    else{const v=list[+ch.dataset.i].v;ch.checked?sel.add(v):sel.delete(v)}
+    onChange()});
+  const one=sel.size===1?[...sel][0]:'';
+  root.querySelector('.msb').textContent=sel.size===0?all:sel.size===1?(list.find(x=>x.v===one)||{}).lbl||one.split(' § ').pop():`${sel.size} seleccionados`}
+// Cuenta las líneas por valor aplicando los demás filtros (cascada)
+function msCount(rows,pass,get,skip){const m=new Map();
+  rows.forEach(r=>{if(!pass(r,skip))return;const v=get(r);if(v)m.set(v,(m.get(v)||0)+1)});return m}
+msInitAll(['fYear','fCountry','fPlatform','fCampaign','fPartner','fNetwork','fBrand','fTC',
+  'iYear','iMonth','iCountry','iPlatform','iCampaign','iPartner','iNetwork','iBrand','iTC','iCruce']);
 // Filtros dinámicos: cada lista muestra solo los valores presentes en las líneas que pasan los demás filtros
-const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',platOf,'Todas'],['fCampaign','campaign',campOf,'Todas'],['fNetwork','network',ncOf,'Todos'],['fPartner','partner',partnerOf,'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos']];
-const BRANDNAME={ML:'Mercado Libre',MP:'Mercado Pago'};
+const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',platOf,'Todas'],['fCampaign','campaign',campOf,'Todas'],['fNetwork','network',ncOf,'Todos'],['fPartner','partner',partnerOf,'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos'],['fTC','tc',tcOf,'Todos']];
 function passes(r,skip){
   for(const [,k,get] of DIMS){if(k===skip)continue;if(F[k].size&&!F[k].has(get(r)))return false}
-  if(!socialOk(r[K.Es_Social],F.social))return false;
   if(q&&!matchQ(r))return false;
   return true;
 }
 function refreshOptions(){
   DIMS.forEach(([id,k,get,all])=>{
-    const vals=[...new Set(L.filter(r=>passes(r,k)).map(get).filter(Boolean))].sort(k==='platform'?pSort:undefined);
-    msFill($('#'+id),vals,F[k],all,k==='brand'?(v=>BRANDNAME[v]||v):null,()=>{page=0;render()});
+    const c=msCount(L,passes,get,k);
+    const items=k==='tc'?tcItems(c)
+      :[...c.keys()].sort(k==='platform'?pSort:undefined).map(v=>({v,lbl:v,n:c.get(v)}));
+    msFill($('#'+id),items,F[k],all,()=>{page=0;render()});
   });
 }
-$('#fSocial').addEventListener('change',e=>{F.social=e.target.value;page=0;render()});
-$('#reset').onclick=()=>{DIMS.forEach(([,k])=>F[k].clear());F.status='valid';F.match='';F.social='';$('#fSocial').value='';$('#q').value='';q='';page=0;render()};
+$('#reset').onclick=()=>{DIMS.forEach(([,k])=>F[k].clear());F.status='valid';F.match='';$('#q').value='';q='';page=0;render()};
 let metric='impr',wmetric='iiee',q='',page=0,sortK='Impressions_CM',sortD=-1;
 $('#segMetric').onclick=e=>{if(!e.target.dataset.m)return;metric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawVar();drawStatus()};
 $('#segWeek').onclick=e=>{if(!e.target.dataset.m)return;wmetric=e.target.dataset.m;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));drawWeek()};
@@ -316,7 +372,7 @@ function filtered(){
     if(F.partner.size&&!F.partner.has(partnerOf(r)))return false;
     if(F.brand.size&&!F.brand.has(brandOf(r)))return false;
     if(F.year.size&&!F.year.has(yearOf(r)))return false;
-    if(!socialOk(r[K.Es_Social],F.social))return false;
+    if(F.tc.size&&!F.tc.has(tcOf(r)))return false;
     const st=r[K.Reach_Status_CM];
     if(F.status==='valid'){if(!VALID.has(st))return false}else if(F.status!=='all'&&st!==F.status)return false;
     if(F.match==='matched'&&!r[K.Plataforma])return false;
@@ -455,21 +511,21 @@ $('#prev').onclick=()=>{page--;drawTable()};$('#next').onclick=()=>{page++;drawT
 // ---- CSV (client structure) ----
 // La descarga respeta los filtros y la búsqueda, pero incluye todas las líneas (no solo las de reach CM válido)
 $('#dl').onclick=()=>{const prev=F.status;F.status='all';const rows=sortRows(filtered());F.status=prev;
-  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato','SOCIAL'];
+  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato','Level 2','Level 3'];
   const p=v=>v==null?'':(v*100).toFixed(2)+'%';const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
-  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r)),r[K.Es_Social]?'sí':'no'].join(',')));
+  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r)),c(r[K.TC_Level2]),c(r[K.TC_Level3])].join(',')));
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`CM_vs_Plataformas_${DATA.cutoff}${F.country.size===1?'_'+[...F.country][0]:''}${F.platform.size===1?'_'+[...F.platform][0]:''}.csv`;a.click();URL.revokeObjectURL(a.href)};
 
 // ===== Pestaña Impresiones (gold_impressions_monthly, embebido columnar en DATA.imp) =====
 const IMPD=DATA.imp||null;let impInit=false,IM=null,cur3=[];
-const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),social:'',q:''};
+const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),tc:new Set(),q:''};
 const CROSS=['Misma tool y taxo','Misma tool, distinta taxo','Misma taxo, sin tool'];
 const MTYPES=[...CROSS,'Solo CM','Solo plataforma','Sin fuente de plataforma'];
 const crLbl=()=>F3.cruce.size===0?'Todos los cruces':F3.cruce.size===1?[...F3.cruce][0]:`${F3.cruce.size} tipos de cruce`;
 const PG_ORDER=['TikTok','Pinterest','DV360 · YouTube','DV360 · Open','DV360 · Deals','DV360 · DOOH','Medios directos','Meta','Google Ads','Twitter','Sin clasificar'];
 const pgSort2=(a,b)=>(PG_ORDER.indexOf(a)+1||99)-(PG_ORDER.indexOf(b)+1||99)||a.localeCompare(b);
 function impDecode(){const D=IMPD.dims;IM={months:IMPD.months,
-  lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],soc:!!a[11],
+  lines:IMPD.lines.map(a=>({side:a[0],c:D.country[a[1]],b:D.brand[a[2]],g:D.pg[a[3]],mt:D.mt[a[4]],tool:a[5],name:D.name[a[6]],nc:D.nc[a[7]],pt:D.partner[a[8]],camp:D.camp[a[9]],tc:D.tc[a[11]],
     ser:a[10]?a[10].split(',').map(s=>{const p=s.split(':');return [+p[0],parseInt(p[1],36)]}):[]}))};
   IM.years=[...new Set(IM.months.map(m=>m.slice(0,4)))].sort();
   const mi=Object.fromEntries(IM.months.map((m,i)=>[m,i]));
@@ -488,8 +544,8 @@ function covText(inv){
     .map(([y,cs])=>`${cs.sort().join(', ')} (${y})`).join(' · ')+'.';
 }
 const INVCOV=covText(IMPD&&IMPD.inv);
-const NOSPLIT='Total de la factura, no se abre por plataforma ni por SOCIAL.';
-const noSplit=()=>'Total de la factura, no se abre por '+(F3.social?'SOCIAL':'plataforma')+'.';
+const NOSPLIT='Total de la factura, no se abre por plataforma ni por tipo de campaña.';
+const noSplit=()=>'Total de la factura, no se abre por '+(F3.tc.size?'tipo de campaña':'plataforma')+'.';
 const DEFS=[
  ['CM total','Todas las impresiones que registró CM360 en el filtro (diario de CM). Incluye líneas sin data de plataforma (Meta, medios directos, Google Ads, Twitter) y líneas sin cruce.'],
  ['CM cruzado','Impresiones de CM solo de las líneas que también existen en la plataforma, según el tipo de cruce elegido (por defecto, misma tool).'],
@@ -505,22 +561,32 @@ const DEFS=[
  ['Impresiones en exceso','CM cruzado − plataforma cruzada; impresiones que CM contó y la plataforma no.'],
  ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],
  ['% de la factura','Monto reclamable ÷ costo facturado.'],
- ['SOCIAL','Líneas compradas por el equipo de social (campo 6 de la taxonomía = SOCIAL). El filtro se aplica a CM y a plataforma a la vez para comparar las mismas líneas.']];
+ ['Tipo de campaña','Sale del campo 6 de la taxonomía contra la guía oficial (se toma el prefijo más largo que calce, según la BU). Abajo está la guía completa.']];
 const DEF=Object.fromEntries(DEFS);
 const tip=k=>` title="${esc(k+': '+(DEF[k]||''))}"`;
 const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
 // Cruzado = la línea cae en los tipos elegidos; sin selección cuentan los tres tipos de cruce
 const inCr=(l,s)=>{const c=s||F3.cruce;return c.size?c.has(l.mt):CROSS.includes(l.mt)};
-const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas']];
+const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas'],['iTC','tc',l=>l.tc,'Todos']];
 const iMatchQ=l=>F3.q.split(/\s+/).every(t=>[l.name,l.tool,l.nc,l.camp].join(' ').toLowerCase().includes(t));
 function iPass(l,skip){for(const [,k,get] of IDIMS){if(k===skip)continue;if(F3[k].size&&!F3[k].has(get(l)))return false}
-  if(!socialOk(l.soc,F3.social))return false;if(F3.q&&!iMatchQ(l))return false;return true}
-function iOpts(){IDIMS.forEach(([id,k,get,all])=>{const vals=[...new Set(IM.lines.filter(l=>iPass(l,k)).map(get).filter(Boolean))].sort(k==='pg'?pgSort2:undefined);
-  msFill($('#'+id),vals,F3[k],all,k==='brand'?(v=>BRANDNAME[v]||v):null,iRender)});
-  msFill($('#iYear'),IM.years,F3.year,'Todos',null,iRender);
-  const mv=IM.months.filter(m=>!F3.year.size||F3.year.has(m.slice(0,4)));
-  msFill($('#iMonth'),mv,F3.month,'Todos',null,iRender);
-  msFill($('#iCruce'),MTYPES,F3.cruce,'Todos',null,iRender)}
+  if(F3.q&&!iMatchQ(l))return false;return true}
+function iOpts(){
+  IDIMS.forEach(([id,k,get,all])=>{const c=msCount(IM.lines,iPass,get,k);
+    const items=k==='tc'?tcItems(c):[...c.keys()].sort(k==='pg'?pgSort2:undefined).map(v=>({v,lbl:v,n:c.get(v)}));
+    msFill($('#'+id),items,F3[k],all,iRender)});
+  // Año, mes y tipo de cruce: el conteo sale de las líneas que pasan los demás filtros
+  const base=IM.lines.filter(l=>iPass(l));
+  const cy=new Map(),cm2=new Map(),cc=new Map();
+  base.forEach(l=>{cc.set(l.mt,(cc.get(l.mt)||0)+1);
+    const ys=new Set(),ms=new Set();
+    l.ser.forEach(x=>{const m=IM.months[x[0]];if(!F3.month.size||F3.month.has(m))ys.add(m.slice(0,4));
+      if(!F3.year.size||F3.year.has(m.slice(0,4)))ms.add(m)});
+    ys.forEach(y=>cy.set(y,(cy.get(y)||0)+1));ms.forEach(m=>cm2.set(m,(cm2.get(m)||0)+1))});
+  msFill($('#iYear'),IM.years.filter(y=>cy.has(y)).map(y=>({v:y,lbl:y,n:cy.get(y)})),F3.year,'Todos',iRender);
+  msFill($('#iMonth'),IM.months.filter(m=>cm2.has(m)).map(m=>({v:m,lbl:m,n:cm2.get(m)})),F3.month,'Todos',iRender);
+  msFill($('#iCruce'),MTYPES.filter(t=>cc.has(t)).map(t=>({v:t,lbl:t,n:cc.get(t)})),F3.cruce,'Todos',iRender);
+  segSync($('#iSeg'),socialMode(F3.tc,[...new Set(IM.lines.map(l=>l.tc))]));}
 function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!(F3.year.size||F3.month.size)||l.ser.some(x=>mOk(x[0]))));billCompute();iKpis();iMonthly();iShare();iMxCountry();iBillCountry();iMxPg();iToolsTbl()}
 const pctN=(a,b)=>b?(a/b*100).toFixed(1)+'%':'—';
 const kpiCard=(t,num,hint)=>`<div class="card kpi"${tip(t)}><h3>${t}</h3><div class="row"><div><span class="num">${num}</span></div></div><div class="hint">${hint}</div></div>`;
@@ -624,13 +690,24 @@ function iToolsTbl(){const g={};
   $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin líneas para el filtro</td></tr>';
   $('#iToolsInfo').textContent=`${Object.keys(g).length} tools/líneas · mostrando ${rows.length}, ordenados por impresiones`}
 if(IMPD){
-  $('#iDefs').innerHTML=DEFS.map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(v)}</div>`).join('')+`<div style="color:var(--ink-3)">${INVCOV} Los meses sin factura muestran “sin factura”. ${NOSPLIT}</div>`;
+  // Tipos de campaña: se arma con la guía embebida (bronze_taxonomy_campaign_types), no a mano
+  const bu=(code,name)=>{const rows=GUIDE.filter(g=>g[0]===code);if(!rows.length)return '';
+    const byL1={};rows.forEach(g=>{(byL1[g[1]]=byL1[g[1]]||{})[g[2]]=(byL1[g[1]][g[2]]||[]).concat([g])});
+    return `<div class="gbu"><h4>${name}</h4>`+Object.keys(byL1).sort().map(l1=>
+      `<div class="gl1">${esc(l1)}</div>`+Object.keys(byL1[l1]).sort((a,b)=>l2rank(a)-l2rank(b)||a.localeCompare(b)).map(l2=>
+        `<div class="gl2">${esc(l2)}</div>`+byL1[l1][l2].map(g=>
+          `<div class="gl3"><b>${esc(g[3])}</b> <code>${esc(g[4])}</code>${g[6]?'':' <i>fuera de la guía</i>'}<br>${esc(g[5]||'')}</div>`).join('')).join('')).join('')+'</div>'};
+  $('#iDefs').innerHTML=`<div class="defgrid">`+DEFS.map(([k,v])=>`<div><b>${esc(k)}:</b> ${esc(v)}</div>`).join('')+
+    `<div style="color:var(--ink-3)">${INVCOV} Los meses sin factura muestran “sin factura”. ${NOSPLIT}</div></div>`+
+    `<div class="guide"><h3>Tipos de campaña</h3><div class="gcols">${bu('ML','Mercado Libre')}${bu('MP','Mercado Pago')}</div>`+
+    `<div class="gnote">Los códigos que no están en la guía se agrupan como “&lt;Level 2&gt; · sin subtipo”. El filtro se aplica a CM y a plataforma a la vez, para comparar siempre las mismas líneas.</div></div>`;
   $('#iDefsBtn').onclick=()=>{const d=$('#iDefs'),on=d.style.display==='none';d.style.display=on?'':'none';$('#iDefsBtn').setAttribute('aria-expanded',on)};
-  $('#iSocial').addEventListener('change',e=>{F3.social=e.target.value;iRender()});
+  $('#iSeg').onclick=e=>{const m=e.target.dataset.s;if(m===undefined)return;
+    setSocial(F3.tc,[...new Set(IM.lines.map(l=>l.tc))],m);iRender()};
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
-  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce'].forEach(k=>F3[k].clear());F3.q='';F3.social='';$('#iSocial').value='';$('#iq').value='';iRender()};
+  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce','tc'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
-    const head=['Lado','País','Marca','Plataforma','Tipo de cruce','SOCIAL','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
+    const head=['Lado','País','BU','Plataforma','Tipo de cruce','Level 2','Level 3','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
       'VAR impresiones','CPM facturado USD','Impresiones en exceso','Monto reclamable USD'];
     const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
     const lines=[head.join(',')].concat(cur3.map(l=>{const by={};for(const [i,v] of l.ser)by[i]=v;
@@ -638,7 +715,7 @@ if(IMPD){
       let ex=0,re=0;const x=inCr(l);
       if(x)for(const [i,v] of l.ser){if(!mOk(i))continue;const iv=INV[l.c+'|'+l.b+'|'+i];if(!iv)continue;
         const d=l.side===0?v:-v;ex+=d;re+=d*iv[6]/1000}
-      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),l.soc?'sí':'no',l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
+      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),c(l.tc.split(' § ')[0]),c(l.tc.split(' § ')[1]),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
         x?-ex:'',ex?(re/ex*1000).toFixed(3):'',x?ex:'',x?re.toFixed(2):''].join(',')}));
     const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Impresiones_mensuales_${DATA.cutoff}.csv`;a.click();URL.revokeObjectURL(a.href)}}
 const tabs=$('#viewTabs');
