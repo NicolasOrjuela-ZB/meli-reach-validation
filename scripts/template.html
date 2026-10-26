@@ -32,10 +32,10 @@ h1{font-size:21px;margin:0;font-weight:700;letter-spacing:-.2px}
 /* Barra de filtros congelada: al hacer scroll se queda arriba y se encoge a un resumen de lo aplicado */
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);margin-bottom:16px;position:sticky;top:0;z-index:45}
 .filters.stuck{border-radius:0 0 var(--radius) var(--radius);border-top-color:transparent;box-shadow:0 8px 20px rgba(0,0,0,.10)}
-.filters.stuck:not(.expanded) .f,.filters.stuck:not(.expanded)>.btn{display:none}
+.filters.stuck:not(.showf) .f,.filters.stuck:not(.showf)>.btn{display:none}
 .filters .fsum{display:none;align-items:center;gap:8px;flex-wrap:wrap;width:100%;min-height:30px}
 .filters.stuck .fsum{display:flex}
-.filters.stuck.expanded .fsum .chips{display:none}
+.filters.stuck.showf .fsum .chips{display:none}
 .fsum>b{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
 .fsum .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
 .fsum .chip{font-size:11.5px;background:var(--surface-2);border-radius:999px;padding:3px 9px;white-space:nowrap}
@@ -98,7 +98,7 @@ td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
 .ms{position:relative;min-width:130px}
 .msb{font:inherit;font-size:13px;padding:7px 24px 7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);width:100%;min-width:130px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
 .msb::after{content:'▾';position:absolute;right:8px;color:var(--ink-3)}
-.msp{position:absolute;top:calc(100% + 4px);left:0;z-index:60;display:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,.14);max-height:280px;overflow:auto;min-width:220px;max-width:360px;padding:6px}
+.msp{position:absolute;top:calc(100% + 4px);left:0;z-index:60;display:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,.14);max-height:280px;overflow:auto;overscroll-behavior:contain;min-width:220px;max-width:360px;padding:6px}
 .ms.open .msp{display:block}
 .msp label{display:flex;gap:7px;align-items:center;padding:4px 7px;border-radius:6px;font-size:12.5px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500;white-space:nowrap}
 .msp label:hover{background:var(--surface-2)}
@@ -348,8 +348,10 @@ function setSocial(sel,universe,mode){sel.clear();
 function segSync(seg,mode){[...seg.children].forEach(b=>b.classList.toggle('on',b.dataset.s===mode))}
 // Multiselect: botón + popup con checkboxes. Vacío = "Todos". El popup queda abierto para marcar varias opciones.
 function msInitAll(ids){ids.forEach(id=>{const root=$('#'+id);root.innerHTML='<button type="button" class="msb">Todos</button><div class="msp"></div>';
-  root.querySelector('.msb').onclick=()=>{const was=root.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was)root.classList.add('open')}})}
-document.addEventListener('click',e=>{if(!e.target.closest('.ms'))document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'))});
+  root.querySelector('.msb').onclick=()=>{const was=root.classList.contains('open');document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));if(!was)root.classList.add('open');stickFilters()}})}
+// isConnected: si el clic viene de un nodo que el re-render ya quitó, no se cierra nada
+document.addEventListener('click',e=>{if(e.target.isConnected&&!e.target.closest('.ms')){
+  document.querySelectorAll('.ms.open').forEach(m=>m.classList.remove('open'));stickFilters()}});
 // items: [{v, lbl, n, g}] con el conteo de líneas que quedan al aplicar los DEMÁS filtros.
 // Lo que sigue marcado pero ya no existe con esos filtros se muestra en gris con conteo 0.
 function msFill(root,items,sel,all,onChange){
@@ -381,12 +383,14 @@ function updSummary(sec,sets,qv){
     :'<span class="chip none">sin filtros aplicados</span>';
 }
 const stickFilters=()=>document.querySelectorAll('.filters').forEach(s=>{
-  if(!s.offsetParent)return;s.classList.toggle('stuck',s.getBoundingClientRect().top<=0.5)});
+  if(!s.offsetParent)return;
+  s.classList.toggle('stuck',s.getBoundingClientRect().top<=0.5);
+  s.classList.toggle('showf',s.classList.contains('expanded')||!!s.querySelector('.ms.open'))});
 window.addEventListener('scroll',stickFilters,{passive:true});
 window.addEventListener('resize',stickFilters);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-exp]');if(!b)return;
   const s=b.closest('.filters'),on=s.classList.toggle('expanded');
-  b.textContent=on?'Ocultar filtros':'Editar filtros'});
+  b.textContent=on?'Ocultar filtros':'Editar filtros';stickFilters()});
 // Cuenta las líneas por valor aplicando los demás filtros (cascada)
 function msCount(rows,pass,get,skip){const m=new Map();
   rows.forEach(r=>{if(!pass(r,skip))return;const v=get(r);if(v)m.set(v,(m.get(v)||0)+1)});return m}
