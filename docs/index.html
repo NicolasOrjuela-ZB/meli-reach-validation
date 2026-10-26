@@ -81,6 +81,9 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
 th.on{color:var(--ink)}
+th:not([data-k]){cursor:default}
+th.on::after{content:" \2193";opacity:.75}
+th.on.asc::after{content:" \2191"}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 td.pl{white-space:normal;min-width:360px;max-width:480px;line-height:1.35}
 .tablewrap{overflow:auto;max-height:60vh;border:1px solid var(--line);border-radius:8px;-webkit-overflow-scrolling:touch}
@@ -257,7 +260,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
 
     <section class="card" style="margin-top:14px">
       <div class="cardhead"><div><h3>Detalle por tool</h3><div class="hint">Todas las líneas del filtro agrupadas por tool (las que no tienen tool van por nombre): qué taxonomías tiene cada lado. Si eliges tipos de cruce, solo esos.</div></div></div>
-      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th>Tool</th><th>Tipo de cruce</th><th>Variación vs CM</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n">Impr CM</th><th class="n">Impr Plat.</th><th class="n">VAR</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th data-k="tool">Tool</th><th data-k="mt">Tipo de cruce</th><th data-k="vc">Variación vs CM</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n" data-k="cm">Impr CM</th><th class="n" data-k="pl">Impr Plat.</th><th class="n" data-k="v">VAR</th></tr></thead><tbody></tbody></table></div>
       <div class="pager" id="iToolsInfo"></div>
     </section>
     </div><!-- /vImp -->
@@ -301,12 +304,14 @@ const brandOf=r=>r[K.Advertiser]&&r[K.Advertiser].includes('MercadoPago')?'MP':'
 const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
 const tcOf=r=>`${r[K.TC_Level2]} § ${r[K.TC_Level3]}`;
 // ---- Variación vs CM: clasifica la línea por el VAR de su tool en lo que quede filtrado ----
-const VNEG='Negativa (CM infla)',VPOS='Positiva (plataforma reporta más)',VEQ='Sin variación',VNO='Sin cruce';
-const VARCATS=[VNEG,VPOS,VEQ,VNO];
+const VTHR=.20;  // corte entre negativa fuerte y leve
+const VNEG='Negativa > 20% (CM infla)',VNEGL='Negativa 1–20% (CM infla)',VPOS='Positiva (plataforma reporta más)',VEQ='Sin variación',VNO='Sin cruce';
+const VARCATS=[VNEG,VNEGL,VPOS,VEQ,VNO];
+const NEGCATS=new Set([VNEG,VNEGL]);
 const varRank=v=>{const i=VARCATS.indexOf(v);return i<0?9:i};
 const varItems=c=>[...c.keys()].sort((a,b)=>varRank(a)-varRank(b)).map(v=>({v,lbl:v,n:c.get(v)}));
-// VAR >= +1% positiva, <= -1% negativa, el resto sin variación
-const varClass=(cm,pl)=>{const v=cm?pl/cm-1:(pl?1:0);return v<=-0.01?VNEG:v>=0.01?VPOS:VEQ};
+// VAR <= -20% negativa fuerte, <= -1% negativa leve, >= +1% positiva, el resto sin variación
+const varClass=(cm,pl)=>{const v=cm?pl/cm-1:(pl?1:0);return v<=-VTHR?VNEG:v<=-0.01?VNEGL:v>=0.01?VPOS:VEQ};
 const varOf=r=>r[K.Plataforma]?varClass(r[K.Impressions_CM]||0,r[K.Impressions_Plataforma]||0):VNO;
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
 
@@ -544,7 +549,8 @@ function sortRows(rows){
   return rows.slice().sort((a,b)=>{const x=val(a,sortK),y=val(b,sortK);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:x>y?1:0)*sortD})}
 const PAGE=50;
 function drawTable(){const rows=tableRows();const n=rows.length;page=Math.min(page,Math.max(0,Math.ceil(n/PAGE)-1));
-  $('#tbl thead').querySelectorAll('th').forEach(th=>th.classList.toggle('on',th.dataset.k===sortK));
+  $('#tbl thead').querySelectorAll('th').forEach(th=>{const on=th.dataset.k===sortK;
+    th.classList.toggle('on',on);th.classList.toggle('asc',on&&sortD>0)});
   const slice=rows.slice(page*PAGE,(page+1)*PAGE);
   $('#tbl tbody').innerHTML=slice.map(r=>'<tr>'+COLS.map(c=>{const v=val(r,c[0]);let t;
     if(c[0].startsWith('v'))t=`<span class="${v>0?'pos':v<0?'neg':''}" style="font-weight:600">${pct(v)}</span>`;
@@ -611,8 +617,8 @@ function covText(inv){
 const INVCOV=covText(IMPD&&IMPD.inv);
 const NOSPLIT='Total de la factura, no se abre por plataforma ni por tipo de campaña.';
 const noSplit=()=>'Total de la factura, no se abre por '+(F3.tc.size?'tipo de campaña':'plataforma')+'.';
-// Con solo "Negativa" el reclamo es bruto (no lo compensan las líneas donde la plataforma reporta más)
-const soloNeg=()=>F3.var.size===1&&F3.var.has(VNEG);
+// Con solo bandas negativas el reclamo es bruto (no lo compensan las líneas donde la plataforma reporta más)
+const soloNeg=()=>F3.var.size>0&&[...F3.var].every(v=>NEGCATS.has(v));
 const reclLbl=()=>soloNeg()?'Reclamable bruto':(!F3.var.size||F3.var.size===VARCATS.length?'Reclamable neto':'Reclamable (filtrado)');
 const reclHint=()=>soloNeg()?'Solo líneas donde CM infla · exceso × CPM ÷ 1.000'
   :(!F3.var.size||F3.var.size===VARCATS.length?'Todas las líneas cruzadas: las que reportan más restan'
@@ -633,7 +639,7 @@ const DEFS=[
  ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],
  ['% de la factura','Monto reclamable ÷ costo facturado.'],
  ['Tipo de campaña','Sale del campo 6 de la taxonomía contra la guía oficial (se toma el prefijo más largo que calce, según la BU). Abajo está la guía completa.'],
- ['Variación vs CM','Clasifica cada línea por el VAR de su tool: negativa si la plataforma reporta al menos 1% menos que CM (CM infla), positiva si reporta al menos 1% más, sin variación si la diferencia es menor al 1%, y sin cruce si la línea existe en un solo lado. Se recalcula con el periodo y los demás filtros aplicados.'],
+ ['Variación vs CM','Clasifica cada línea por el VAR de su tool: negativa > 20% si la plataforma reporta más de 20% menos que CM (CM infla fuerte), negativa 1–20% si reporta entre 1% y 20% menos, positiva si reporta al menos 1% más, sin variación si la diferencia es menor al 1%, y sin cruce si la línea existe en un solo lado. Se recalcula con el periodo y los demás filtros aplicados.'],
  ['Reclamable neto','Exceso de todas las líneas cruzadas; las líneas donde la plataforma reporta más que CM restan.'],
  ['Reclamable bruto','Exceso solo de las líneas donde CM cuenta más que la plataforma.']];
 const DEF=Object.fromEntries(DEFS);
@@ -766,14 +772,28 @@ function iShare(){
     const sh=v/tot;return `<div class="shbar"><i style="width:${(sh/maxSh*58).toFixed(1)}%;background:${col}"></i><span><b>${(sh*100).toFixed(1)}%</b> · ${fmt(v)}</span></div>`};
   box.innerHTML=rows.map(r=>`<div class="shrow"><div class="shlbl">${esc(r.t)}</div><div>${bar(r.cm,cmT,'var(--s-cm)')}${bar(r.pl,plT,'var(--s-pl)')}</div></div>`).join('');
 }
+// Orden de la tabla: por defecto impresiones (el máximo de los dos lados), clic en la cabecera para cambiarlo
+let tsK='impr',tsD=-1;const TSMAX=100;
+const TSLBL={impr:'impresiones',tool:'tool',mt:'tipo de cruce',vc:'variación vs CM',cm:'impresiones de CM',pl:'impresiones de plataforma',v:'VAR'};
+const TSNUM=new Set(['impr','cm','pl','v']);
+const tsVal=(r,k)=>k==='impr'?Math.max(r.cm,r.pl):k==='tool'?(r.t||null):k==='mt'?[...r.mt].sort().join(', ')
+  :k==='vc'?varRank(r.vc):k==='v'?r.v:r[k];
 function iToolsTbl(){const g={};
   cur3.forEach(l=>{if(!crSel(l))return;const s=lSum(l);if(!s)return;
     const key=varKey(l);const o=g[key]=g[key]||{t:l.tool,cm:0,pl:0,cn:new Set(),pn:new Set(),mt:new Set(),vc:ivarOf(l)};
     o.mt.add(l.mt);if(l.side===0){o.cm+=s;o.cn.add(l.name)}else{o.pl+=s;o.pn.add(l.name)}});
-  const rows=Object.values(g).map(o=>({...o,v:o.cm&&o.pl?o.pl/o.cm-1:null})).sort((a,b)=>Math.max(b.cm,b.pl)-Math.max(a.cm,a.pl)).slice(0,100);
+  const all=Object.values(g).map(o=>({...o,v:o.cm&&o.pl?o.pl/o.cm-1:null}))
+    .sort((a,b)=>{const x=tsVal(a,tsK),y=tsVal(b,tsK);
+      if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;
+      return (x<y?-1:x>y?1:0)*tsD});
+  const rows=all.slice(0,TSMAX);
+  $('#iTools thead').querySelectorAll('th').forEach(th=>{const on=!!th.dataset.k&&th.dataset.k===tsK;
+    th.classList.toggle('on',on);th.classList.toggle('asc',on&&tsD>0)});
   const names=st=>{const a=[...st];return (a.slice(0,4).map(n=>`<div>${esc(n)}</div>`).join('')+(a.length>4?`<div style="color:var(--ink-3)">+${a.length-4} más</div>`:''))||'—'};
-  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td style="white-space:normal">${esc(r.vc)}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Sin líneas para el filtro</td></tr>';
-  $('#iToolsInfo').textContent=`${Object.keys(g).length} tools/líneas · mostrando ${rows.length}, ordenados por impresiones`}
+  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td style="white-space:normal">${esc(r.vc)}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n"><span class="${r.v>0?'pos':r.v<0?'neg':''}" style="font-weight:600">${pct(r.v)}</span></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Sin líneas para el filtro</td></tr>';
+  $('#iToolsInfo').textContent=`${fmtN(all.length)} tools/líneas · mostrando ${rows.length}`+
+    `, ordenados por ${TSLBL[tsK]} ${tsD<0?'de mayor a menor':'de menor a mayor'}`+
+    ' · haz clic en una columna para reordenar'}
 if(IMPD){
   // Tipos de campaña: se arma con la guía embebida (bronze_taxonomy_campaign_types), no a mano
   const bu=(code,name)=>{const rows=GUIDE.filter(g=>g[0]===code);if(!rows.length)return '';
@@ -789,6 +809,8 @@ if(IMPD){
   $('#iDefsBtn').onclick=()=>{const d=$('#iDefs'),on=d.style.display==='none';d.style.display=on?'':'none';$('#iDefsBtn').setAttribute('aria-expanded',on)};
   $('#iSeg').onclick=e=>{const m=e.target.dataset.s;if(m===undefined)return;
     setSocial(F3.tc,[...new Set(IM.lines.map(l=>l.tc))],m);iRender()};
+  $('#iTools thead').onclick=e=>{const th=e.target.closest('th'),k=th&&th.dataset.k;if(!k)return;
+    if(tsK===k)tsD*=-1;else{tsK=k;tsD=TSNUM.has(k)?-1:1}iToolsTbl()};
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
   $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce','tc','var'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
