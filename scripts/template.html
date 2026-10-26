@@ -154,6 +154,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
       <div class="f"><label>Partner</label><div class="ms" id="fPartner"></div></div>
       <div class="f"><label>Network code</label><div class="ms" id="fNetwork"></div></div>
       <div class="f"><label>Tipo de campaña</label><div class="ms" id="fTC"></div></div>
+      <div class="f"><label>Variación vs CM</label><div class="ms" id="fVar"></div></div>
       <div class="f" style="flex:1;min-width:240px"><label for="q">Buscar taxonomía / tool / placement ID</label><input type="search" id="q" placeholder="Ej. 27057035, PINTEREST-SPOT-HOME, MUNDIAL…"></div>
       <button class="btn" id="reset">Limpiar</button>
       <button class="btn primary" id="dl">Descargar tabla (CSV, todas las líneas)</button>
@@ -204,6 +205,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
       <div class="f"><label>Partner</label><div class="ms" id="iPartner"></div></div>
       <div class="f"><label>Network code</label><div class="ms" id="iNetwork"></div></div>
       <div class="f"><label>Tipo de campaña</label><div class="ms" id="iTC"></div></div>
+      <div class="f"><label>Variación vs CM</label><div class="ms" id="iVar"></div></div>
       <div class="f"><label>Tipo de cruce</label><div class="ms" id="iCruce"></div></div>
       <div class="f" style="flex:1;min-width:220px"><label for="iq">Buscar taxonomía / tool / network</label><input type="search" id="iq" placeholder="Ej. 94980379, TT-INF, MUNDIAL…"></div>
       <button class="btn" id="iReset">Limpiar</button>
@@ -241,7 +243,7 @@ th.grp{text-align:center;font-size:10.5px;letter-spacing:.08em;color:var(--ink-2
 
     <section class="card" style="margin-top:14px">
       <div class="cardhead"><div><h3>Detalle por tool</h3><div class="hint">Todas las líneas del filtro agrupadas por tool (las que no tienen tool van por nombre): qué taxonomías tiene cada lado. Si eliges tipos de cruce, solo esos.</div></div></div>
-      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th>Tool</th><th>Tipo de cruce</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n">Impr CM</th><th class="n">Impr Plat.</th><th class="n">VAR</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap" style="max-height:60vh"><table id="iTools"><thead><tr><th>Tool</th><th>Tipo de cruce</th><th>Variación vs CM</th><th>Taxonomías en CM</th><th>Taxonomías en plataforma</th><th class="n">Impr CM</th><th class="n">Impr Plat.</th><th class="n">VAR</th></tr></thead><tbody></tbody></table></div>
       <div class="pager" id="iToolsInfo"></div>
     </section>
     </div><!-- /vImp -->
@@ -284,10 +286,18 @@ const PCOLG={'DV360 · Open':'#2a78d6','DV360 · YouTube':'#e34948','DV360 · De
 const brandOf=r=>r[K.Advertiser]&&r[K.Advertiser].includes('MercadoPago')?'MP':'ML';
 const yearOf=r=>r[K.Fecha_inicio]?r[K.Fecha_inicio].slice(0,4):'';
 const tcOf=r=>`${r[K.TC_Level2]} § ${r[K.TC_Level3]}`;
+// ---- Variación vs CM: clasifica la línea por el VAR de su tool en lo que quede filtrado ----
+const VNEG='Negativa (CM infla)',VPOS='Positiva (plataforma reporta más)',VEQ='Sin variación',VNO='Sin cruce';
+const VARCATS=[VNEG,VPOS,VEQ,VNO];
+const varRank=v=>{const i=VARCATS.indexOf(v);return i<0?9:i};
+const varItems=c=>[...c.keys()].sort((a,b)=>varRank(a)-varRank(b)).map(v=>({v,lbl:v,n:c.get(v)}));
+// VAR >= +1% positiva, <= -1% negativa, el resto sin variación
+const varClass=(cm,pl)=>{const v=cm?pl/cm-1:(pl?1:0);return v<=-0.01?VNEG:v>=0.01?VPOS:VEQ};
+const varOf=r=>r[K.Plataforma]?varClass(r[K.Impressions_CM]||0,r[K.Impressions_Plataforma]||0):VNO;
 $('#cutoff').textContent=new Date(DATA.cutoff+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
 
 // filters
-const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),tc:new Set(),status:'valid',match:''};
+const F={country:new Set(),platform:new Set(),campaign:new Set(),network:new Set(),partner:new Set(),brand:new Set(),year:new Set(),tc:new Set(),var:new Set(),status:'valid',match:''};
 // ---- Tipo de campaña (guía oficial: bronze_taxonomy_campaign_types) ----
 // El valor del filtro es "Level 2 § Level 3"; en el popup se agrupa por Level 2.
 const GUIDE=DATA.guide||[];
@@ -343,19 +353,23 @@ function msFill(root,items,sel,all,onChange){
 // Cuenta las líneas por valor aplicando los demás filtros (cascada)
 function msCount(rows,pass,get,skip){const m=new Map();
   rows.forEach(r=>{if(!pass(r,skip))return;const v=get(r);if(v)m.set(v,(m.get(v)||0)+1)});return m}
-msInitAll(['fYear','fCountry','fPlatform','fCampaign','fPartner','fNetwork','fBrand','fTC',
-  'iYear','iMonth','iCountry','iPlatform','iCampaign','iPartner','iNetwork','iBrand','iTC','iCruce']);
+msInitAll(['fYear','fCountry','fPlatform','fCampaign','fPartner','fNetwork','fBrand','fTC','fVar',
+  'iYear','iMonth','iCountry','iPlatform','iCampaign','iPartner','iNetwork','iBrand','iTC','iVar','iCruce']);
 // Filtros dinámicos: cada lista muestra solo los valores presentes en las líneas que pasan los demás filtros
-const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',platOf,'Todas'],['fCampaign','campaign',campOf,'Todas'],['fNetwork','network',ncOf,'Todos'],['fPartner','partner',partnerOf,'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos'],['fTC','tc',tcOf,'Todos']];
+const DIMS=[['fCountry','country',r=>r[K.Country],'Todos'],['fPlatform','platform',platOf,'Todas'],['fCampaign','campaign',campOf,'Todas'],['fNetwork','network',ncOf,'Todos'],['fPartner','partner',partnerOf,'Todos'],['fBrand','brand',brandOf,'Todas'],['fYear','year',yearOf,'Todos'],['fTC','tc',tcOf,'Todos'],['fVar','var',varOf,'Todas']];
+// Mismo criterio de estado que la tabla, para que los conteos de los filtros cuadren con lo que se ve
+const statusOk=r=>{const st=r[K.Reach_Status_CM];
+  return F.status==='valid'?VALID.has(st):(F.status==='all'||st===F.status)};
 function passes(r,skip){
   for(const [,k,get] of DIMS){if(k===skip)continue;if(F[k].size&&!F[k].has(get(r)))return false}
+  if(!statusOk(r))return false;
   if(q&&!matchQ(r))return false;
   return true;
 }
 function refreshOptions(){
   DIMS.forEach(([id,k,get,all])=>{
     const c=msCount(L,passes,get,k);
-    const items=k==='tc'?tcItems(c)
+    const items=k==='tc'?tcItems(c):k==='var'?varItems(c)
       :[...c.keys()].sort(k==='platform'?pSort:undefined).map(v=>({v,lbl:v,n:c.get(v)}));
     msFill($('#'+id),items,F[k],all,()=>{page=0;render()});
   });
@@ -377,8 +391,8 @@ function filtered(){
     if(F.brand.size&&!F.brand.has(brandOf(r)))return false;
     if(F.year.size&&!F.year.has(yearOf(r)))return false;
     if(F.tc.size&&!F.tc.has(tcOf(r)))return false;
-    const st=r[K.Reach_Status_CM];
-    if(F.status==='valid'){if(!VALID.has(st))return false}else if(F.status!=='all'&&st!==F.status)return false;
+    if(F.var.size&&!F.var.has(varOf(r)))return false;
+    if(!statusOk(r))return false;
     if(F.match==='matched'&&!r[K.Plataforma])return false;
     if(F.match==='CM_ONLY'&&r[K.Plataforma])return false;
     if(F.match==='doubtful'&&!doubtful(r))return false;
@@ -515,14 +529,27 @@ $('#prev').onclick=()=>{page--;drawTable()};$('#next').onclick=()=>{page++;drawT
 // ---- CSV (client structure) ----
 // La descarga respeta los filtros y la búsqueda, pero incluye todas las líneas (no solo las de reach CM válido)
 $('#dl').onclick=()=>{const prev=F.status;F.status='all';const rows=sortRows(filtered());F.status=prev;
-  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato','Level 2','Level 3'];
+  const head=['Advertiser','Placement','Placement ID','TOOL','Country','Chosen Frequency','Impressions CM','Impressions Plataforma','VAR%','Reach CM','Reach Plataforma','VAR%','IIEE CM','IIEE Plataforma','VAR%','Fecha inicio','Fecha Fin','Network Code','Campaña','Plataforma','Estado reach CM','Partner','Formato','Level 2','Level 3','Variación vs CM'];
   const p=v=>v==null?'':(v*100).toFixed(2)+'%';const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
-  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r)),c(r[K.TC_Level2]),c(r[K.TC_Level3])].join(',')));
+  const lines=[head.join(',')].concat(rows.map(r=>[c(r[K.Advertiser]),c(r[K.Placement]),c(r[K.Placement_ID]),c(r[K.TOOL]),c(r[K.Country]),c(r[K.Chosen_Frequency]),r[K.Impressions_CM]??'',r[K.Impressions_Plataforma]??'',p(ratio(r,'Impressions_CM','Impressions_Plataforma')),r[K.Reach_CM]??'',r[K.Reach_Plataforma]??'',p(ratio(r,'Reach_CM','Reach_Plataforma')),r[K.IIEE_CM]??'',r[K.IIEE_Plataforma]??'',p(ratio(r,'IIEE_CM','IIEE_Plataforma')),c(r[K.Fecha_inicio]),c(r[K.Fecha_fin]),c(ncOf(r)),c(r[K.Campana]),c(r[K.Plataforma]?platOf(r):''),c(r[K.Reach_Status_CM]),c(partnerOf(r)),c(formatoOf(r)),c(r[K.TC_Level2]),c(r[K.TC_Level3]),c(varOf(r))].join(',')));
   const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`CM_vs_Plataformas_${DATA.cutoff}${F.country.size===1?'_'+[...F.country][0]:''}${F.platform.size===1?'_'+[...F.platform][0]:''}.csv`;a.click();URL.revokeObjectURL(a.href)};
 
 // ===== Pestaña Impresiones (gold_impressions_monthly, embebido columnar en DATA.imp) =====
 const IMPD=DATA.imp||null;let impInit=false,IM=null,cur3=[];
-const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),tc:new Set(),q:''};
+const F3={country:new Set(),pg:new Set(),camp:new Set(),partner:new Set(),nc:new Set(),brand:new Set(),year:new Set(),month:new Set(),cruce:new Set(),tc:new Set(),var:new Set(),q:''};
+// La clase de variación se recalcula en cada render: suma CM y plataforma de la tool en lo filtrado
+// (periodo incluido) y compara. Las líneas que no cruzan quedan en "Sin cruce".
+const NOCROSS=new Set(['Solo CM','Solo plataforma','Sin fuente de plataforma']);
+const varKey=l=>l.tool||('·'+l.name);
+let VARMAP=new Map();
+function buildVarMap(){
+  const g=new Map();
+  IM.lines.forEach(l=>{if(NOCROSS.has(l.mt)||!iPass(l,'var'))return;
+    const s=lSum(l);if(!s)return;const k=varKey(l),o=g.get(k)||{cm:0,pl:0};
+    if(l.side===0)o.cm+=s;else o.pl+=s;g.set(k,o)});
+  VARMAP=new Map();g.forEach((o,k)=>VARMAP.set(k,varClass(o.cm,o.pl)));
+}
+const ivarOf=l=>NOCROSS.has(l.mt)?VNO:(VARMAP.get(varKey(l))||VNO);
 const CROSS=['Misma tool y taxo','Misma tool, distinta taxo','Misma taxo, sin tool'];
 const MTYPES=[...CROSS,'Solo CM','Solo plataforma','Sin fuente de plataforma'];
 const crLbl=()=>F3.cruce.size===0?'Todos los cruces':F3.cruce.size===1?[...F3.cruce][0]:`${F3.cruce.size} tipos de cruce`;
@@ -550,6 +577,12 @@ function covText(inv){
 const INVCOV=covText(IMPD&&IMPD.inv);
 const NOSPLIT='Total de la factura, no se abre por plataforma ni por tipo de campaña.';
 const noSplit=()=>'Total de la factura, no se abre por '+(F3.tc.size?'tipo de campaña':'plataforma')+'.';
+// Con solo "Negativa" el reclamo es bruto (no lo compensan las líneas donde la plataforma reporta más)
+const soloNeg=()=>F3.var.size===1&&F3.var.has(VNEG);
+const reclLbl=()=>soloNeg()?'Reclamable bruto':(!F3.var.size||F3.var.size===VARCATS.length?'Reclamable neto':'Reclamable (filtrado)');
+const reclHint=()=>soloNeg()?'Solo líneas donde CM infla · exceso × CPM ÷ 1.000'
+  :(!F3.var.size||F3.var.size===VARCATS.length?'Todas las líneas cruzadas: las que reportan más restan'
+  :'Exceso de las líneas del filtro × CPM ÷ 1.000');
 const DEFS=[
  ['CM total','Todas las impresiones que registró CM360 en el filtro (diario de CM). Incluye líneas sin data de plataforma (Meta, medios directos, Google Ads, Twitter) y líneas sin cruce.'],
  ['CM cruzado','Impresiones de CM solo de las líneas que también existen en la plataforma, según el tipo de cruce elegido (por defecto, misma tool).'],
@@ -565,33 +598,44 @@ const DEFS=[
  ['Impresiones en exceso','CM cruzado − plataforma cruzada; impresiones que CM contó y la plataforma no.'],
  ['Monto reclamable','Impresiones en exceso × CPM facturado ÷ 1.000, calculado por país, BU y mes. Usa solo líneas comparables (cruzadas), por eso es una estimación conservadora.'],
  ['% de la factura','Monto reclamable ÷ costo facturado.'],
- ['Tipo de campaña','Sale del campo 6 de la taxonomía contra la guía oficial (se toma el prefijo más largo que calce, según la BU). Abajo está la guía completa.']];
+ ['Tipo de campaña','Sale del campo 6 de la taxonomía contra la guía oficial (se toma el prefijo más largo que calce, según la BU). Abajo está la guía completa.'],
+ ['Variación vs CM','Clasifica cada línea por el VAR de su tool: negativa si la plataforma reporta al menos 1% menos que CM (CM infla), positiva si reporta al menos 1% más, sin variación si la diferencia es menor al 1%, y sin cruce si la línea existe en un solo lado. Se recalcula con el periodo y los demás filtros aplicados.'],
+ ['Reclamable neto','Exceso de todas las líneas cruzadas; las líneas donde la plataforma reporta más que CM restan.'],
+ ['Reclamable bruto','Exceso solo de las líneas donde CM cuenta más que la plataforma.']];
 const DEF=Object.fromEntries(DEFS);
 const tip=k=>` title="${esc(k+': '+(DEF[k]||''))}"`;
 const lSum=l=>{let s=0;for(const x of l.ser)if(mOk(x[0]))s+=x[1];return s};
 // Cruzado = la línea cae en los tipos elegidos; sin selección cuentan los tres tipos de cruce
 const inCr=(l,s)=>{const c=s||F3.cruce;return c.size?c.has(l.mt):CROSS.includes(l.mt)};
-const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas'],['iTC','tc',l=>l.tc,'Todos']];
+const IDIMS=[['iCountry','country',l=>l.c,'Todos'],['iPlatform','pg',l=>l.g,'Todas'],['iCampaign','camp',l=>l.camp,'Todas'],['iPartner','partner',l=>l.pt,'Todos'],['iNetwork','nc',l=>l.nc,'Todos'],['iBrand','brand',l=>l.b,'Todas'],['iTC','tc',l=>l.tc,'Todos'],['iVar','var',ivarOf,'Todas']];
 const iMatchQ=l=>F3.q.split(/\s+/).every(t=>[l.name,l.tool,l.nc,l.camp].join(' ').toLowerCase().includes(t));
+// ¿La línea tiene impresiones dentro del periodo filtrado? (se omite el propio filtro de periodo)
+const iLive=(l,skip)=>{const y=skip==='year'?null:F3.year,m=skip==='month'?null:F3.month;
+  if(!(y&&y.size)&&!(m&&m.size))return true;
+  return l.ser.some(x=>{const mm=IM.months[x[0]];
+    return (!y||!y.size||y.has(mm.slice(0,4)))&&(!m||!m.size||m.has(mm))})};
 function iPass(l,skip){for(const [,k,get] of IDIMS){if(k===skip)continue;if(F3[k].size&&!F3[k].has(get(l)))return false}
+  if(!iLive(l,skip))return false;
   if(F3.q&&!iMatchQ(l))return false;return true}
 function iOpts(){
   IDIMS.forEach(([id,k,get,all])=>{const c=msCount(IM.lines,iPass,get,k);
-    const items=k==='tc'?tcItems(c):[...c.keys()].sort(k==='pg'?pgSort2:undefined).map(v=>({v,lbl:v,n:c.get(v)}));
+    const items=k==='tc'?tcItems(c):k==='var'?varItems(c):[...c.keys()].sort(k==='pg'?pgSort2:undefined).map(v=>({v,lbl:v,n:c.get(v)}));
     msFill($('#'+id),items,F3[k],all,iRender)});
-  // Año, mes y tipo de cruce: el conteo sale de las líneas que pasan los demás filtros
-  const base=IM.lines.filter(l=>iPass(l));
+  // Año, mes y tipo de cruce: cada uno cuenta con los demás filtros aplicados, sin el suyo
   const cy=new Map(),cm2=new Map(),cc=new Map();
-  base.forEach(l=>{cc.set(l.mt,(cc.get(l.mt)||0)+1);
-    const ys=new Set(),ms=new Set();
-    l.ser.forEach(x=>{const m=IM.months[x[0]];if(!F3.month.size||F3.month.has(m))ys.add(m.slice(0,4));
-      if(!F3.year.size||F3.year.has(m.slice(0,4)))ms.add(m)});
-    ys.forEach(y=>cy.set(y,(cy.get(y)||0)+1));ms.forEach(m=>cm2.set(m,(cm2.get(m)||0)+1))});
+  IM.lines.forEach(l=>{
+    if(iPass(l,'year')){const ys=new Set();
+      l.ser.forEach(x=>{const m=IM.months[x[0]];if(!F3.month.size||F3.month.has(m))ys.add(m.slice(0,4))});
+      ys.forEach(y=>cy.set(y,(cy.get(y)||0)+1))}
+    if(iPass(l,'month')){const ms=new Set();
+      l.ser.forEach(x=>{const m=IM.months[x[0]];if(!F3.year.size||F3.year.has(m.slice(0,4)))ms.add(m)});
+      ms.forEach(m=>cm2.set(m,(cm2.get(m)||0)+1))}
+    if(iPass(l))cc.set(l.mt,(cc.get(l.mt)||0)+1)});
   msFill($('#iYear'),IM.years.filter(y=>cy.has(y)).map(y=>({v:y,lbl:y,n:cy.get(y)})),F3.year,'Todos',iRender);
   msFill($('#iMonth'),IM.months.filter(m=>cm2.has(m)).map(m=>({v:m,lbl:m,n:cm2.get(m)})),F3.month,'Todos',iRender);
   msFill($('#iCruce'),MTYPES.filter(t=>cc.has(t)).map(t=>({v:t,lbl:t,n:cc.get(t)})),F3.cruce,'Todos',iRender);
   segSync($('#iSeg'),socialMode(F3.tc,[...new Set(IM.lines.map(l=>l.tc))]));}
-function iRender(){if(!impInit)return;iOpts();cur3=IM.lines.filter(l=>iPass(l)&&(!(F3.year.size||F3.month.size)||l.ser.some(x=>mOk(x[0]))));billCompute();iKpis();iMonthly();iShare();iMxCountry();iBillCountry();iMxPg();iToolsTbl()}
+function iRender(){if(!impInit)return;buildVarMap();iOpts();cur3=IM.lines.filter(l=>iPass(l));billCompute();iKpis();iMonthly();iShare();iMxCountry();iBillCountry();iMxPg();iToolsTbl()}
 const pctN=(a,b)=>b?(a/b*100).toFixed(1)+'%':'—';
 const kpiCard=(t,num,hint)=>`<div class="card kpi"${tip(t)}><h3>${t}</h3><div class="row"><div><span class="num">${num}</span></div></div><div class="hint">${hint}</div></div>`;
 // Facturación: la factura es por país × BU × mes, así que el exceso se calcula con ese mismo corte
@@ -625,7 +669,7 @@ function iKpis(){let cmT=0,plT=0,cmX=0,plX=0;
      kpiCard('Costo facturado',b.inv?usd(b.bc):'—',note)+
      kpiCard('CPM facturado',cpm?'$'+cpm.toFixed(3):'—','Costo ÷ impresiones facturadas × 1.000')+
      kpiCard('Impresiones en exceso',b.inv?fmt(b.ex):'—','CM cruzado − plataforma cruzada, solo meses con factura')+
-     kpiCard('Monto reclamable',b.inv?usd(b.re):'—','Exceso × CPM ÷ 1.000, por país, BU y mes')+
+     kpiCard(reclLbl(),b.inv?usd(b.re):'—',reclHint())+
      kpiCard('% de la factura',b.inv&&b.bc?pctN(b.re,b.bc):'—','Monto reclamable ÷ costo facturado'))}
 function iMonthlyData(){const M=IM.months.map((m,i)=>({m,i,cmT:0,cmX:0,plT:0,plX:0}));
   cur3.forEach(l=>{const x=inCr(l);for(const [i,v] of l.ser){if(!mOk(i))continue;const o=M[i];if(l.side===0){o.cmT+=v;if(x)o.cmX+=v}else{o.plT+=v;if(x)o.plX+=v}}});
@@ -687,11 +731,11 @@ function iShare(){
 }
 function iToolsTbl(){const g={};
   cur3.forEach(l=>{if(!crSel(l))return;const s=lSum(l);if(!s)return;
-    const key=l.tool||'·'+l.name;const o=g[key]=g[key]||{t:l.tool,cm:0,pl:0,cn:new Set(),pn:new Set(),mt:new Set()};
+    const key=varKey(l);const o=g[key]=g[key]||{t:l.tool,cm:0,pl:0,cn:new Set(),pn:new Set(),mt:new Set(),vc:ivarOf(l)};
     o.mt.add(l.mt);if(l.side===0){o.cm+=s;o.cn.add(l.name)}else{o.pl+=s;o.pn.add(l.name)}});
   const rows=Object.values(g).map(o=>({...o,v:o.cm&&o.pl?o.pl/o.cm-1:null})).sort((a,b)=>Math.max(b.cm,b.pl)-Math.max(a.cm,a.pl)).slice(0,100);
   const names=st=>{const a=[...st];return (a.slice(0,4).map(n=>`<div>${esc(n)}</div>`).join('')+(a.length>4?`<div style="color:var(--ink-3)">+${a.length-4} más</div>`:''))||'—'};
-  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin líneas para el filtro</td></tr>';
+  $('#iTools tbody').innerHTML=rows.map(r=>`<tr><td>${esc(r.t||'—')}</td><td style="white-space:normal">${[...r.mt].map(t=>esc(MTSHORT[t]||t)).join('<br>')}</td><td style="white-space:normal">${esc(r.vc)}</td><td class="pl">${names(r.cn)}</td><td class="pl">${names(r.pn)}</td><td class="n">${fmtN(r.cm)}</td><td class="n">${fmtN(r.pl)}</td><td class="n">${pct(r.v)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Sin líneas para el filtro</td></tr>';
   $('#iToolsInfo').textContent=`${Object.keys(g).length} tools/líneas · mostrando ${rows.length}, ordenados por impresiones`}
 if(IMPD){
   // Tipos de campaña: se arma con la guía embebida (bronze_taxonomy_campaign_types), no a mano
@@ -709,9 +753,9 @@ if(IMPD){
   $('#iSeg').onclick=e=>{const m=e.target.dataset.s;if(m===undefined)return;
     setSocial(F3.tc,[...new Set(IM.lines.map(l=>l.tc))],m);iRender()};
   $('#iq').oninput=e=>{F3.q=e.target.value.trim().toLowerCase();iRender()};
-  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce','tc'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
+  $('#iReset').onclick=()=>{['country','pg','camp','partner','nc','brand','year','month','cruce','tc','var'].forEach(k=>F3[k].clear());F3.q='';$('#iq').value='';iRender()};
   $('#iDl').onclick=()=>{const mi=IM.months.map((m,i)=>i).filter(mOk);
-    const head=['Lado','País','BU','Plataforma','Tipo de cruce','Level 2','Level 3','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
+    const head=['Lado','País','BU','Plataforma','Tipo de cruce','Variación vs CM','Level 2','Level 3','Tool','Network code','Partner','Campaña','Taxonomía',...mi.map(i=>IM.months[i]),'Total',
       'VAR impresiones','CPM facturado USD','Impresiones en exceso','Monto reclamable USD'];
     const c=v=>v==null?'':`"${String(v).replace(/"/g,'""')}"`;
     const lines=[head.join(',')].concat(cur3.map(l=>{const by={};for(const [i,v] of l.ser)by[i]=v;
@@ -719,7 +763,7 @@ if(IMPD){
       let ex=0,re=0;const x=inCr(l);
       if(x)for(const [i,v] of l.ser){if(!mOk(i))continue;const iv=INV[l.c+'|'+l.b+'|'+i];if(!iv)continue;
         const d=l.side===0?v:-v;ex+=d;re+=d*iv[6]/1000}
-      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),c(l.tc.split(' § ')[0]),c(l.tc.split(' § ')[1]),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
+      return [l.side===0?'CM':'PLATAFORMA',l.c,l.b,c(l.g),c(l.mt),c(ivarOf(l)),c(l.tc.split(' § ')[0]),c(l.tc.split(' § ')[1]),l.tool,c(l.nc),c(l.pt),c(l.camp),c(l.name),...mi.map(i=>by[i]??''),lSum(l),
         x?-ex:'',ex?(re/ex*1000).toFixed(3):'',x?ex:'',x?re.toFixed(2):''].join(',')}));
     const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Impresiones_mensuales_${DATA.cutoff}.csv`;a.click();URL.revokeObjectURL(a.href)}}
 const tabs=$('#viewTabs');
