@@ -10,6 +10,8 @@ Detecta solo el tipo de archivo y lo carga en la tabla bronze que corresponde:
 
 Reglas de reemplazo (idempotente: correrlo dos veces con el mismo archivo no duplica):
   - Ventana: se borran las filas de ese window_id antes de insertar (refresco de líneas en curso).
+    Un rango de >=80 días que no está en el plan es la ventana rodante del schedule y entra como
+    'LAST90' (reemplazo completo en cada corrida).
   - Semanal CM: se borran las semanas que trae el archivo (CM ajusta las últimas ~3 semanas).
     La semana INICIAL recortada (el rango arranca después del domingo, como pasa siempre con
     LAST_60_DAYS) se descarta: pisaría con datos parciales la semana completa ya cargada.
@@ -44,7 +46,9 @@ def _cm_body(path):
 
 
 def window_id(rs, re_):
-    """Usa el id del plan (R01..R30) si el rango coincide; si no, un id nuevo por fechas."""
+    """Usa el id del plan (R01..R30) si el rango coincide. Si no: un rango de 80 días o más es la
+    ventana rodante del schedule diario (LAST_90_DAYS) y se carga como 'LAST90' —el DELETE por
+    window_id la reemplaza entera en cada corrida—; el resto, un id nuevo por fechas."""
     try:
         client = bigquery.Client(project=PROJECT)
         q = f"SELECT DISTINCT window_id FROM `{PROJECT}.{DS}.bronze_cm_window_plan` WHERE range_start = '{rs.date()}' AND range_end = '{re_.date()}'"
@@ -53,6 +57,8 @@ def window_id(rs, re_):
             return rows[0]["window_id"]
     except Exception:
         pass
+    if (re_ - rs).days >= 80:
+        return "LAST90"
     return f"W{rs:%Y%m%d}_{re_:%Y%m%d}"
 
 
