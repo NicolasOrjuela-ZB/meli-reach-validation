@@ -62,7 +62,7 @@ Requiere `pip install google-cloud-bigquery pandas db-dtypes` y credencial de GC
 5. **Network code** = campo 3 de la taxonomía, estandarizado al código vigente del maestro; los que no están en el maestro se muestran tal cual y marcados.
 6. **Meta queda fuera:** CM no mide reach ahí (reach/impresiones ≈ 0.01%). MLB y MEC no están en CM.
 7. **Refresco:** una línea se congela cuando su flight efectivo terminó hace más de 7 días (CM cierra números a los 7 días). Solo se vuelven a pedir ventanas de líneas nuevas o en curso. El semanal reemplaza solo las últimas semanas.
-8. `bronze_cm_impressions_daily` es **histórico** (carga única, ene-2025 → oct-2026). En adelante impresiones y flight salen del semanal.
+8. `bronze_cm_impressions_daily` se **refresca a diario** con el reporte Estandar de CM (schedule por API, `LAST_30_DAYS`; `load_cm.py` reemplaza las fechas del rango del archivo). El histórico previo a sep-2026 (desde ene-2025) vino de la carga única original y no se vuelve a tocar.
 
 ## Limitaciones de CM encontradas
 

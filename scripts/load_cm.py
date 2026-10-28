@@ -4,12 +4,16 @@ Detecta solo el tipo de archivo y lo carga en la tabla bronze que corresponde:
 
   Reach de CM por ventana (Reach_total_Reg, sin Week)      -> bronze_cm_reach_window
   Reach de CM semanal con pivot (Pivoted_reach, con Week)  -> bronze_cm_reach_weekly
+  Impresiones diarias de CM (Estandar_total_Reg, con Date) -> bronze_cm_impressions_daily
   Reach semanal de DV360 (DV_REACH_PIVOTED)                 -> bronze_platform_reach_weekly
   Reach semanal de Pinterest (Day to Day Cumulative)        -> bronze_platform_reach_weekly
 
 Reglas de reemplazo (idempotente: correrlo dos veces con el mismo archivo no duplica):
   - Ventana: se borran las filas de ese window_id antes de insertar (refresco de líneas en curso).
   - Semanal CM: se borran las semanas que trae el archivo (CM ajusta las últimas ~3 semanas).
+    La semana INICIAL recortada (el rango arranca después del domingo, como pasa siempre con
+    LAST_60_DAYS) se descarta: pisaría con datos parciales la semana completa ya cargada.
+  - Diario CM: se borran las fechas del rango del archivo antes de insertar.
   - Plataforma: se borran las semanas de esa plataforma que trae el archivo.
   - Semana parcial final (termina después del corte del reporte) se carga igual; la vista la marca.
 
@@ -36,7 +40,7 @@ def _cm_body(path):
     df = pd.read_csv(io.StringIO("\n".join(body)), na_values=["-"], dtype=str)
     s, e = [x.strip() for x in meta["Date Range"].split("-")]
     rs, re_ = pd.to_datetime(s), pd.to_datetime(e)
-    return df, rs, re_
+    return df, rs, re_, meta
 
 
 def window_id(rs, re_):
@@ -53,7 +57,7 @@ def window_id(rs, re_):
 
 
 def parse_cm_window(path):
-    df, rs, re_ = _cm_body(path)
+    df, rs, re_, _ = _cm_body(path)
     df.columns = ["advertiser_id", "advertiser", "placement_id", "placement", "reach_1"]
     df["reach_1"] = pd.to_numeric(df.reach_1.str.replace(",", ""), errors="coerce").astype("Int64")
     out = pd.DataFrame({"window_id": window_id(rs, re_), "range_start": rs.date(), "range_end": re_.date(),
@@ -62,8 +66,20 @@ def parse_cm_window(path):
     return "bronze_cm_reach_window", out, f"window_id = '{out.window_id.iloc[0]}'"
 
 
+def parse_cm_daily(path):
+    """Estandar_total_Reg: impresiones por placement × día. Reemplaza las fechas del rango."""
+    df, rs, re_, meta = _cm_body(path)
+    df.columns = ["date", "advertiser_id", "advertiser", "placement_id", "placement", "impressions"]
+    out = pd.DataFrame({"date": pd.to_datetime(df.date).dt.date,
+                        "advertiser_id": df.advertiser_id, "placement_id": df.placement_id,
+                        "impressions": pd.to_numeric(df.impressions.str.replace(",", ""), errors="coerce").astype("Int64"),
+                        "report_timezone": meta.get("Report Time Zone", "America/Los_Angeles"),
+                        "loaded_at": NOW})
+    return "bronze_cm_impressions_daily", out, f"date BETWEEN '{rs.date()}' AND '{re_.date()}'"
+
+
 def parse_cm_weekly(path):
-    df, rs, re_ = _cm_body(path)
+    df, rs, re_, _ = _cm_body(path)
     df.columns = ["week", "advertiser_id", "advertiser", "placement_id", "placement", "impressions"] + R
     wk = pd.to_datetime(df.week)
     assert (wk.dt.weekday == 6).all(), "La columna Week de CM debe empezar en domingo"
@@ -74,6 +90,14 @@ def parse_cm_weekly(path):
         out[c] = pd.to_numeric(df[c].str.replace(",", ""), errors="coerce").round().astype("Int64")
     out["report_range_start"], out["report_range_end"] = rs.date(), re_.date()
     out["report_generated_at"], out["loaded_at"] = NOW, NOW
+    # La primera semana del rango casi nunca arranca en domingo (LAST_60_DAYS): CM la mide
+    # recortada desde el inicio del rango, y cargarla pisaría con datos parciales la semana
+    # completa que ya está en la tabla. Se descarta. La parcial FINAL sí se carga (la vista la marca).
+    recorte = out.week_start < rs.date()
+    if recorte.any():
+        print(f"  descarta la semana inicial recortada {min(out.week_start[recorte])} "
+              f"({int(recorte.sum())} filas: el rango del reporte arranca el {rs.date()})")
+        out = out[~recorte]
     weeks = ",".join(f"'{w}'" for w in sorted(out.week_start.unique()))
     pids = ",".join(f"'{p}'" for p in out.placement_id.unique())
     # Reemplaza solo las semanas y placements que trae el archivo (Pinterest filtrado no pisa el resto)
@@ -128,7 +152,7 @@ def detect(path):
     if "Report Fields" in open(path, encoding="utf-8-sig", errors="ignore").read():
         L = open(path, encoding="utf-8-sig").read().splitlines()
         hdr = L[L.index("Report Fields") + 1]
-        return parse_cm_weekly if hdr.startswith("Week,") else parse_cm_window
+        return parse_cm_weekly if hdr.startswith("Week,") else parse_cm_daily if hdr.startswith("Date,") else parse_cm_window
     raise ValueError(f"No reconozco el formato de {path}")
 
 
