@@ -10,6 +10,7 @@
 --  · El join con `pl` usa la llave del grupo (platform, tool_id, gkey), no el STRING_AGG de campañas:
 --    ese texto depende del orden de agregación y hacía que una fila apareciera o no entre ejecuciones.
 CREATE OR REPLACE VIEW `mbw-spl-brazil.ds_meli_reach_validation.gold_cm_vs_platform`
+OPTIONS(description="Cruce CM vs plataforma por línea (reach total, impresiones). El lado plataforma excluye MEC. Ver sql/gold_cm_vs_platform.sql")
 AS
 WITH cm0 AS (SELECT * FROM `mbw-spl-brazil.ds_meli_reach_validation.gold_cm_reach_total` WHERE cm_reach_measurable),
 grp AS (SELECT DISTINCT tool_id, rep_placement_id FROM `mbw-spl-brazil.ds_meli_reach_validation.silver_cm_tool_groups`),
@@ -35,7 +36,7 @@ cm AS (
   FROM agg a
   JOIN cm0 r ON r.placement_id = a.rep_placement_id
   LEFT JOIN `mbw-spl-brazil.ds_meli_reach_validation.bronze_cm_reach_tool_override` o ON o.tool_id = a.tool_id),
-pl_raw AS (SELECT * FROM `mbw-spl-brazil.ds_meli_reach_validation.silver_platform_lines` WHERE country_code NOT IN ('MLB','MEC')),
+pl_raw AS (SELECT * FROM `mbw-spl-brazil.ds_meli_reach_validation.silver_platform_lines` WHERE country_code <> 'MEC'),
 pl AS (
   SELECT platform, tool_id, IF(tool_id IS NULL, UPPER(campaign), NULL) AS gkey,
     UPPER(ANY_VALUE(campaign)) AS name_key, COUNT(*) platform_campaigns_n,

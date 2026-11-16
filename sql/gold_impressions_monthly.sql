@@ -11,7 +11,7 @@
 --   toman el grupo de su línea de CM (la taxonomía de CM manda).
 -- CM: bronze_cm_impressions_daily. Plataforma: Adverity 2025 + bronze_platform_daily_2026, cortado a la última fecha de CM.
 CREATE OR REPLACE VIEW `mbw-spl-brazil.ds_meli_reach_validation.gold_impressions_monthly`
-OPTIONS(description="Impresiones mensuales CM vs plataforma por línea y tipo de cruce (tool / tool+taxo / tool distinta taxo). Ver sql/gold_impressions_monthly.sql")
+OPTIONS(description="Impresiones mensuales CM vs plataforma por línea y tipo de cruce, con tipo de campaña (guía ML/MP), cuenta e IDs (line_id = placement de CM; platform_campaign_id = Campaign_id de Adverity). Excluye del lado plataforma las cuentas PERFORMANCE, la cuenta 'Mercado Pago MLC Individuals' (wallet/installs, no es del equipo) y las campañas TikTok MLC sin cuenta (la cuenta performance de Chile que Adverity retiró de su fuente).")
 AS
 WITH cutoff AS (SELECT MAX(date) d FROM `mbw-spl-brazil.ds_meli_reach_validation.bronze_cm_impressions_daily`),
 cm_countries AS (SELECT DISTINCT SUBSTR(advertiser,1,3) c FROM `mbw-spl-brazil.ds_meli_reach_validation.bronze_cm_placements`),
@@ -22,25 +22,35 @@ nc AS (
 cm AS (
   SELECT 'CM' AS side, d.placement_id AS line_id, TRIM(p.placement) AS line_name, SUBSTR(p.advertiser,1,3) AS country,
          IF(p.advertiser LIKE '%MercadoPago%','MP','ML') AS brand, CAST(NULL AS STRING) AS source_platform,
-         DATE_TRUNC(d.date, MONTH) AS month, SUM(d.impressions) AS impressions
+         DATE_TRUNC(d.date, MONTH) AS month, SUM(d.impressions) AS impressions,
+         ANY_VALUE(p.advertiser) AS cuenta, CAST(NULL AS STRING) AS platform_campaign_id
   FROM `mbw-spl-brazil.ds_meli_reach_validation.bronze_cm_impressions_daily` d
   JOIN `mbw-spl-brazil.ds_meli_reach_validation.bronze_cm_placements` p USING (placement_id)
   WHERE d.date >= '2025-01-01'
   GROUP BY 1,2,3,4,5,6,7),
 pl_src AS (
-  SELECT Platform AS platform, Campaign_Ajustado AS campaign, Date AS date, Impressions AS impressions
+  SELECT Platform AS platform, Campaign_Ajustado AS campaign, Date AS date, Impressions AS impressions, Account AS account, Campaign_id AS campaign_id
   FROM `mbw-spl-brazil.meli_latam_adverity.TABLE_DLY_DIGITAL_UNIFIED_2025`
   WHERE Platform IN ('DV360','TikTok','Pinterest') AND Date >= '2025-01-01' AND Date < '2026-01-01'
   UNION ALL
-  SELECT Platform, Campaign, Date, Impressions
+  SELECT Platform, Campaign, Date, Impressions, account, campaign_id
   FROM `mbw-spl-brazil.ds_meli_reach_validation.bronze_platform_daily_2026`
   WHERE Platform IN ('DV360','TikTok','Pinterest') AND Date >= '2026-01-01'),
 pl AS (
   SELECT 'PLATAFORMA', CAST(NULL AS STRING), TRIM(campaign), SUBSTR(TRIM(campaign),1,3),
          IF(SPLIT(TRIM(campaign),'_')[SAFE_OFFSET(1)] = 'MP','MP','ML'), platform,
-         DATE_TRUNC(date, MONTH), CAST(ROUND(SUM(impressions)) AS INT64)
+         DATE_TRUNC(date, MONTH), CAST(ROUND(SUM(impressions)) AS INT64),
+         ANY_VALUE(account), ANY_VALUE(campaign_id)
   FROM pl_src, cutoff
   WHERE date <= cutoff.d AND SUBSTR(TRIM(campaign),1,3) IN (SELECT c FROM cm_countries)
+    -- Cuentas de performance: fuera del comparativo (no son campañas del equipo y confunden el "Solo plataforma").
+    AND NOT REGEXP_CONTAINS(UPPER(IFNULL(account,'')), 'PERFORMANCE')
+    -- Mercado Pago MLC Individuals: cuenta de wallet/app installs de MP Chile, no es del equipo de medios.
+    AND IFNULL(account,'') <> 'Mercado Pago MLC Individuals'
+    -- TikTok MLC sin cuenta: campañas que Adverity retiró de su fuente (la cuenta performance de Chile,
+    -- AO/DPA/CATALOGO/installs). Si Adverity las restaura con cuenta, esta regla deja de aplicarles
+    -- y manda la regla de arriba.
+    AND NOT (platform = 'TikTok' AND account IS NULL AND SUBSTR(TRIM(campaign),1,3) = 'MLC')
   GROUP BY 1,2,3,4,5,6,7
   HAVING SUM(impressions) > 0),
 lines AS (SELECT * FROM cm UNION ALL SELECT * FROM pl),
@@ -123,6 +133,6 @@ SELECT side, month, country, brand, platform_group, family, source_platform,
   IFNULL(tc.t.level2,'Sin clasificar') AS tc_level2,
   IFNULL(tc.t.level3,'Sin clasificar') AS tc_level3,
   IFNULL(tc.t.en_guia, FALSE) AS tc_en_guia,
-  tool_id, line_id, line_name, code3 AS network_code_raw, COALESCE(network_code_std, code3) AS network_code,
-  partner, formato, campana, impressions
+  tool_id, line_id, platform_campaign_id, line_name, code3 AS network_code_raw, COALESCE(network_code_std, code3) AS network_code,
+  partner, formato, campana, cuenta, impressions
 FROM mm LEFT JOIN tc USING (tc_bu, campo6)

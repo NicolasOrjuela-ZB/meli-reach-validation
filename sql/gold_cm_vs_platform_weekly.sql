@@ -3,6 +3,7 @@
 -- reach y el IIEE de CM NO (serían usuarios repetidos entre placements): salen del override semanal a
 -- nivel tool (bronze_cm_reach_tool_weekly_override) o quedan NULL.
 CREATE OR REPLACE VIEW `mbw-spl-brazil.ds_meli_reach_validation.gold_cm_vs_platform_weekly`
+OPTIONS(description="Cruce semanal CM vs plataforma por tool (impresiones, reach 1+, IIEE). Ver sql/gold_cm_vs_platform_weekly.sql")
 AS
 WITH cm0 AS (
   SELECT country, brand, placement_id, placement, tool_id, taxo_platform, week_start, week_end, is_partial_week, chosen_frequency,
