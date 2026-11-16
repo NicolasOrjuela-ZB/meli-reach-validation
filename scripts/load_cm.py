@@ -2,21 +2,27 @@
 
 Detecta solo el tipo de archivo y lo carga en la tabla bronze que corresponde:
 
-  Reach de CM por ventana (Reach_total_Reg, sin Week)      -> bronze_cm_reach_window
-  Reach de CM semanal con pivot (Pivoted_reach, con Week)  -> bronze_cm_reach_weekly
-  Impresiones diarias de CM (Estandar_total_Reg, con Date) -> bronze_cm_impressions_daily
+  Reach de CM por ventana (Reach_total_Reg, sin Week)       -> bronze_cm_reach_window
+  Reach de CM semanal con pivot (Pivoted_reach, con Week)   -> bronze_cm_reach_weekly
+  Reach de CM trimestral con pivot (Pivoted_reach SIN Week,
+    rango = un trimestre calendario exacto)                 -> bronze_cm_reach_quarter
+  Impresiones diarias de CM (Estandar_total_Reg, con Date)  -> bronze_cm_impressions_daily
   Reach semanal de DV360 (DV_REACH_PIVOTED)                 -> bronze_platform_reach_weekly
   Reach semanal de Pinterest (Day to Day Cumulative)        -> bronze_platform_reach_weekly
 
-Reglas de reemplazo (idempotente: correrlo dos veces con el mismo archivo no duplica):
-  - Ventana: se borran las filas de ese window_id antes de insertar (refresco de líneas en curso).
-    Un rango de >=80 días que no está en el plan es la ventana rodante del schedule y entra como
-    'LAST90' (reemplazo completo en cada corrida).
-  - Semanal CM: se borran las semanas que trae el archivo (CM ajusta las últimas ~3 semanas).
-    La semana INICIAL recortada (el rango arranca después del domingo, como pasa siempre con
-    LAST_60_DAYS) se descarta: pisaría con datos parciales la semana completa ya cargada.
-  - Diario CM: se borran las fechas del rango del archivo antes de insertar.
-  - Plataforma: se borran las semanas de esa plataforma que trae el archivo.
+Reglas de reemplazo (idempotente: correrlo dos veces con el mismo archivo no duplica).
+Todo DELETE queda además acotado a los advertisers/placements que trae el archivo: los
+exports pueden venir filtrados a un solo país (p. ej. Brasil) y no deben pisar el resto.
+  - Ventana: se borran las filas de ese window_id Y esos advertisers (refresco de líneas en
+    curso). Un rango de >=80 días que no está en el plan es la ventana rodante del schedule
+    y entra como 'LAST90' (reemplazo completo del país en cada corrida).
+  - Semanal CM: se borran las semanas × placements que trae el archivo (CM ajusta las
+    últimas ~3 semanas). La semana INICIAL recortada (el rango arranca después del domingo,
+    como pasa siempre con LAST_60_DAYS) se descarta: pisaría con datos parciales la semana
+    completa ya cargada.
+  - Trimestral CM: se borran ese quarter × placements del archivo.
+  - Diario CM: se borran las fechas del rango × advertisers del archivo.
+  - Plataforma: se borran las semanas de esa plataforma × advertisers del archivo.
   - Semana parcial final (termina después del corte del reporte) se carga igual; la vista la marca.
 
 Uso:  python scripts/load_cm.py <archivo.csv> [--dry-run]
@@ -69,7 +75,8 @@ def parse_cm_window(path):
     out = pd.DataFrame({"window_id": window_id(rs, re_), "range_start": rs.date(), "range_end": re_.date(),
                         "advertiser_id": df.advertiser_id, "advertiser": df.advertiser, "placement_id": df.placement_id,
                         "placement": df.placement, "reach_1": df.reach_1, "source_file": os.path.basename(path), "loaded_at": NOW})
-    return "bronze_cm_reach_window", out, f"window_id = '{out.window_id.iloc[0]}'"
+    advs = ",".join(f"'{a}'" for a in sorted(out.advertiser_id.unique()))
+    return "bronze_cm_reach_window", out, f"window_id = '{out.window_id.iloc[0]}' AND advertiser_id IN ({advs})"
 
 
 def parse_cm_daily(path):
@@ -81,7 +88,8 @@ def parse_cm_daily(path):
                         "impressions": pd.to_numeric(df.impressions.str.replace(",", ""), errors="coerce").astype("Int64"),
                         "report_timezone": meta.get("Report Time Zone", "America/Los_Angeles"),
                         "loaded_at": NOW})
-    return "bronze_cm_impressions_daily", out, f"date BETWEEN '{rs.date()}' AND '{re_.date()}'"
+    advs = ",".join(f"'{a}'" for a in sorted(out.advertiser_id.unique()))
+    return "bronze_cm_impressions_daily", out, f"date BETWEEN '{rs.date()}' AND '{re_.date()}' AND advertiser_id IN ({advs})"
 
 
 def parse_cm_weekly(path):
@@ -110,6 +118,25 @@ def parse_cm_weekly(path):
     return "bronze_cm_reach_weekly", out, f"week_start IN ({weeks}) AND placement_id IN ({pids})"
 
 
+def parse_cm_quarter(path):
+    """Pivoted_reach SIN Week con rango = trimestre calendario: reach pivotado del trimestre
+    entero por placement. Reemplaza ese quarter solo para los placements del archivo."""
+    df, rs, re_, _ = _cm_body(path)
+    df.columns = ["advertiser_id", "advertiser", "placement_id", "placement", "impressions"] + R
+    q_end = (rs + pd.offsets.QuarterEnd(0)).date()
+    assert rs.day == 1 and rs.month in (1, 4, 7, 10) and re_.date() == q_end, \
+        f"El rango {rs.date()}..{re_.date()} no es un trimestre calendario exacto"
+    quarter = f"Q{(rs.month - 1) // 3 + 1}_{rs.year}"
+    out = pd.DataFrame({"quarter": quarter, "range_start": rs.date(), "range_end": re_.date(),
+                        "advertiser": df.advertiser, "placement_id": df.placement_id, "placement": df.placement,
+                        "impressions": pd.to_numeric(df.impressions.str.replace(",", ""), errors="coerce").astype("Int64")})
+    for c in R:
+        out[c] = pd.to_numeric(df[c].str.replace(",", ""), errors="coerce").round().astype("Int64")
+    out["loaded_at"] = NOW
+    pids = ",".join(f"'{p}'" for p in out.placement_id.unique())
+    return "bronze_cm_reach_quarter", out, f"quarter = '{quarter}' AND placement_id IN ({pids})"
+
+
 def parse_dv360_weekly(path):
     L = open(path, encoding="utf-8-sig").read().splitlines()
     body = [l for l in L[1:] if re.match(r"^\d{4}/\d{2}/\d{2} - ", l)]
@@ -125,7 +152,8 @@ def parse_dv360_weekly(path):
     out["report_range_start"], out["report_range_end"] = out.week_start.min(), out.week_end.max()
     out["source_file"], out["loaded_at"] = os.path.basename(path), NOW
     weeks = ",".join(f"'{w}'" for w in sorted(out.week_start.unique()))
-    return "bronze_platform_reach_weekly", out, f"platform = 'DV360' AND week_start IN ({weeks})"
+    advs = ",".join(f"'{a}'" for a in sorted(out.advertiser.unique()))
+    return "bronze_platform_reach_weekly", out, f"platform = 'DV360' AND week_start IN ({weeks}) AND advertiser IN ({advs})"
 
 
 def parse_pinterest_weekly(path):
@@ -146,7 +174,8 @@ def parse_pinterest_weekly(path):
     out["report_range_end"] = last.EVENT_DATE.dt.date.values
     out["source_file"], out["loaded_at"] = os.path.basename(path), NOW
     weeks = ",".join(f"'{w}'" for w in sorted(out.week_start.unique()))
-    return "bronze_platform_reach_weekly", out, f"platform = 'Pinterest' AND week_start IN ({weeks})"
+    advs = ",".join(f"'{a}'" for a in sorted(out.advertiser.unique()))
+    return "bronze_platform_reach_weekly", out, f"platform = 'Pinterest' AND week_start IN ({weeks}) AND advertiser IN ({advs})"
 
 
 def detect(path):
@@ -158,7 +187,12 @@ def detect(path):
     if "Report Fields" in open(path, encoding="utf-8-sig", errors="ignore").read():
         L = open(path, encoding="utf-8-sig").read().splitlines()
         hdr = L[L.index("Report Fields") + 1]
-        return parse_cm_weekly if hdr.startswith("Week,") else parse_cm_daily if hdr.startswith("Date,") else parse_cm_window
+        if hdr.startswith("Week,"):
+            return parse_cm_weekly
+        if hdr.startswith("Date,"):
+            return parse_cm_daily
+        # Sin Week ni Date: ventana (reach solo) o trimestral (pivot con Impressions y 1+..10+)
+        return parse_cm_quarter if ",Impressions," in hdr else parse_cm_window
     raise ValueError(f"No reconozco el formato de {path}")
 
 
